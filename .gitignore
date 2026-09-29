@@ -1,0 +1,48 @@
+.env*
+!.env.example
+
+# Python environments, caches, and generated metadata
+.DS_Store
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pyright/
+.hypothesis/
+.tox/
+.nox/
+.coverage*
+htmlcov/
+*.egg-info/
+
+# Node dependencies and build output
+.pnpm-store/
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+
+# Tool caches and logs
+.cache/
+.vite/
+.turbo/
+*.log
+
+# macOS and editor files
+.AppleDouble
+.LSOverride
+._*
+.idea/
+.vscode/
+.fleet/
+*.swp
+*.swo
+*~
+
+# Local project notes intentionally kept out of source control
+/*_Diploma_*.md
+/*_Mentor_*.md
+/ROADMAP.md

@@ -1,0 +1,46 @@
+{
+  "realm": "accessflow",
+  "enabled": true,
+  "displayName": "AccessFlow",
+  "internationalizationEnabled": true,
+  "supportedLocales": ["ru", "en"],
+  "defaultLocale": "ru",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "roles": {
+    "realm": [
+      { "name": "HR", "description": "Управление карточками сотрудников" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "accessflow-web",
+      "name": "AccessFlow",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": ["http://localhost:8080/*", "http://localhost:5173/*"],
+      "webOrigins": ["http://localhost:8080", "http://localhost:5173"],
+      "attributes": { "pkce.code.challenge.method": "S256" },
+      "protocolMappers": [
+        {
+          "name": "accessflow-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "accessflow-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ]
+}
