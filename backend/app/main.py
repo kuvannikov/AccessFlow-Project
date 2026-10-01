@@ -1,22 +1,30 @@
 import secrets
 import time
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI
+from fastapi.exceptions import RequestValidationError
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse
-from sqlalchemy import select, text
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.auth import require_hr
 from app.db import get_session
 from app.logging_config import configure_logging, logger, request_id
-from app.models import Employee
-from app.schemas import EmployeeCreate, EmployeeRead, NameInput, SlugSuggestion
-from app.slug import base_slug
+from app.routes.employees import router as employees_router
 
 configure_logging()
 app = FastAPI(title="AccessFlow API", docs_url=None, redoc_url=None)
+app.include_router(employees_router)
+
+
+@app.exception_handler(RequestValidationError)
+async def invalid_request(_request: Request, exc: RequestValidationError) -> JSONResponse:
+    # Raw inputs may contain invalid Unicode or non-finite numbers, which cannot
+    # be rendered as JSON. Keep field diagnostics without echoing submitted data.
+    details = [{key: error[key] for key in ("type", "loc", "msg")} for error in exc.errors()]
+    return JSONResponse(status_code=422, content={"detail": details})
 
 
 @app.middleware("http")
@@ -63,70 +71,6 @@ def ready(session: Session = Depends(get_session)) -> JSONResponse:
     return JSONResponse(content={"status": "ready"})
 
 
-@app.get("/api/me", dependencies=[Depends(require_hr)])
+@app.get("/api/me")
 def me(claims: dict = Depends(require_hr)) -> dict[str, str]:
     return {"name": claims.get("name") or claims.get("preferred_username") or "HR"}
-
-
-@app.get("/api/employees", response_model=list[EmployeeRead], dependencies=[Depends(require_hr)])
-def list_employees(session: Session = Depends(get_session)) -> list[Employee]:
-    return list(
-        session.scalars(select(Employee).order_by(Employee.created_at.desc(), Employee.id.desc()))
-    )
-
-
-@app.post(
-    "/api/employees/slug-suggestion",
-    response_model=SlugSuggestion,
-    dependencies=[Depends(require_hr)],
-)
-def suggest_slug(data: NameInput, session: Session = Depends(get_session)) -> SlugSuggestion:
-    logger.debug("slug_suggestion_requested")
-    try:
-        root = base_slug(data.first_name, data.last_name)
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-    candidate = root
-    number = 2
-    while session.scalar(select(Employee.id).where(Employee.slug == candidate)) is not None:
-        candidate = f"{root}-{number}"
-        number += 1
-    return SlugSuggestion(slug=candidate)
-
-
-@app.post(
-    "/api/employees",
-    response_model=EmployeeRead,
-    status_code=201,
-    dependencies=[Depends(require_hr)],
-)
-def create_employee(data: EmployeeCreate, session: Session = Depends(get_session)) -> Employee:
-    employee = Employee(**data.model_dump())
-    employee.email = employee.email.lower()
-    session.add(employee)
-    try:
-        session.commit()
-    except IntegrityError as exc:
-        session.rollback()
-        if session.scalar(select(Employee.id).where(Employee.slug == data.slug)) is not None:
-            logger.warning("employee_create_conflict field=slug")
-            raise HTTPException(
-                status_code=409,
-                detail={"code": "slug_conflict", "message": "Этот slug уже занят"},
-            ) from exc
-        logger.warning("employee_create_conflict field=email")
-        raise HTTPException(
-            status_code=409,
-            detail={"code": "email_conflict", "message": "Сотрудник с таким email уже существует"},
-        ) from exc
-    session.refresh(employee)
-    return employee
-
-
-@app.delete("/api/employees/{employee_id}", status_code=204, dependencies=[Depends(require_hr)])
-def delete_employee(employee_id: int, session: Session = Depends(get_session)) -> None:
-    employee = session.get(Employee, employee_id)
-    if employee is None:
-        raise HTTPException(status_code=404, detail="Сотрудник не найден")
-    session.delete(employee)
-    session.commit()

@@ -6,6 +6,8 @@ from app.slug import slug_part
 
 
 def clean(value: str) -> str:
+    if "\x00" in value:
+        raise ValueError("Поле содержит недопустимые символы")
     return " ".join(value.strip().split())
 
 

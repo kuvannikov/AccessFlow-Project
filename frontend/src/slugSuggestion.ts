@@ -1,4 +1,5 @@
 export type Names = { first_name: string; last_name: string }
+export const slugInputPattern = String.raw`[a-z0-9]+([.\-][a-z0-9]+)*`
 
 export function createSlugSuggestion(
   fetchSlug: (names: Names) => Promise<string>,
