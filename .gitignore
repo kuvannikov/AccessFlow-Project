@@ -1,48 +1,30 @@
-.env*
+# Environment and secrets
+.env
+.env.*
 !.env.example
 
-# Python environments, caches, and generated metadata
+# OS files
 .DS_Store
+
+# Python
 .venv/
-venv/
 __pycache__/
-*.py[cod]
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
-.pyright/
-.hypothesis/
-.tox/
-.nox/
-.coverage*
+.coverage
 htmlcov/
-*.egg-info/
+.hypothesis/
 
-# Node dependencies and build output
-.pnpm-store/
+# Node
 node_modules/
 dist/
-build/
 *.tsbuildinfo
+playwright-report/
+test-results/
+coverage/
+storybook-static/
 
-# Tool caches and logs
-.cache/
-.vite/
-.turbo/
-*.log
-
-# macOS and editor files
-.AppleDouble
-.LSOverride
-._*
+# Editors and logs
 .idea/
-.vscode/
-.fleet/
-*.swp
-*.swo
-*~
-
-# Local project notes intentionally kept out of source control
-/*_Diploma_*.md
-/*_Mentor_*.md
-/ROADMAP.md
+*.log
