@@ -1,3 +1,6 @@
+# Local development infrastructure: PostgreSQL and Keycloak.
+# Every port is bound to 127.0.0.1, so the services are reachable
+# only from this machine.
 name: accessflow
 
 services:
@@ -12,9 +15,15 @@ services:
       ACCESSFLOW_APP_PASSWORD: ${ACCESSFLOW_APP_PASSWORD:?Set ACCESSFLOW_APP_PASSWORD in .env}
       KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?Set KEYCLOAK_DB_PASSWORD in .env}
     volumes:
+      # Mount at /var/lib/postgresql, not deeper: the postgres:18 image keeps
+      # its data in a versioned subdirectory and would create an anonymous
+      # volume otherwise.
       - postgres_data:/var/lib/postgresql
+      # Init scripts run only on the first start, when the data directory is empty.
       - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
+      # Check over TCP (-h 127.0.0.1): during the first start a temporary server
+      # listens on a Unix socket only, so a socket check would report ready too early.
       test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres"]
       interval: 5s
       timeout: 3s
@@ -28,6 +37,8 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.8.0
+    # start-dev is for development only; --import-realm loads the realm files
+    # from the mounted directory (a realm that already exists is skipped).
     command: ["start-dev", "--import-realm"]
     depends_on:
       postgres:
@@ -39,13 +50,18 @@ services:
       KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
       KC_DB_USERNAME: keycloak
       KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?Set KEYCLOAK_DB_PASSWORD in .env}
+      # The public URL of Keycloak. It becomes the issuer ("iss") in tokens.
       KC_HOSTNAME: http://localhost:8081
+      # Serves /health/ready on the management port 9000.
       KC_HEALTH_ENABLED: "true"
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?Set KEYCLOAK_ADMIN_PASSWORD in .env}
     volumes:
+      # Only realm .json files belong in this directory: all of them are imported.
       - ./infra/keycloak:/opt/keycloak/data/import:ro
     healthcheck:
+      # The image has no curl or wget, so the check uses bash and /dev/tcp.
+      # "$$" is an escaped "$": otherwise Compose substitutes the variable itself.
       test:
         - CMD
         - bash
