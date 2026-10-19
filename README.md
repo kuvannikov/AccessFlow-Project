@@ -52,12 +52,13 @@ PostgreSQL roles:
 
 ### Commands
 
-| Command     | What it does                                                    |
-|-------------|-----------------------------------------------------------------|
-| `make up`   | Start the services and wait until they are healthy              |
-| `make down` | Stop and remove the containers; the data volume is kept         |
-| `make ps`   | Show the state of the services                                  |
-| `make logs` | Follow the logs (stop with Ctrl+C)                              |
+| Command      | What it does                                                    |
+|--------------|-----------------------------------------------------------------|
+| `make up`    | Start the services and wait until they are healthy              |
+| `make down`  | Stop and remove the containers; the data volume is kept         |
+| `make ps`    | Show the state of the services                                  |
+| `make logs`  | Follow the logs (stop with Ctrl+C)                              |
+| `make check` | Lint, format check, types and tests of the backend              |
 
 ### Data
 
@@ -67,3 +68,49 @@ survives `make down`. Do not run `docker compose down -v` or
 
 Passwords from `.env` are applied only when the database is created.
 Changing them later does not change the passwords of existing roles.
+
+## Backend
+
+The API is a Python project in `backend/`, managed by [uv](https://docs.astral.sh/uv/).
+The Python version is pinned in `backend/.python-version`, and the dependency
+versions are pinned in `backend/uv.lock`.
+
+### Setup
+
+```bash
+cd backend
+uv sync --frozen
+```
+
+`--frozen` installs exactly the versions from `uv.lock` and never changes it.
+
+### Run
+
+The API needs one environment variable, `ACCESSFLOW_ENVIRONMENT`
+(`development`, `test` or `production`). Without it the application refuses
+to start. The variable is read from the process environment, not from `.env`.
+
+```bash
+cd backend
+ACCESSFLOW_ENVIRONMENT=development uv run --frozen uvicorn accessflow.app:create_app \
+  --factory --host 127.0.0.1 --port 8000
+```
+
+Check that it is alive:
+
+```bash
+curl -i http://127.0.0.1:8000/api/health
+```
+
+The answer is `200 OK` with the body `{"status":"ok"}`.
+
+### Checks
+
+Run from the repository root:
+
+```bash
+make check
+```
+
+It runs Ruff (lint and format check), mypy in strict mode and pytest. Warnings
+raised during tests are treated as errors.
