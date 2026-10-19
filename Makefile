@@ -1,4 +1,14 @@
-.PHONY: up down logs ps
+.PHONY: up down logs ps check backend-check
+
+# Run every check of the project (the frontend joins later).
+check: backend-check
+
+# Lint, format check, types and tests of the backend.
+backend-check:
+	cd backend && uv run --frozen ruff check .
+	cd backend && uv run --frozen ruff format --check .
+	cd backend && uv run --frozen mypy
+	cd backend && uv run --frozen pytest
 
 # Start the dev stack and wait until both services are healthy.
 up:

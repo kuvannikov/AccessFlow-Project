@@ -1,0 +1,55 @@
+[project]
+name = "accessflow"
+version = "0.1.0"
+description = "Backend API of the employee onboarding and offboarding platform."
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi>=0.148.0",
+    "pydantic-settings>=2.16.0",
+    "uvicorn>=0.54.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.1,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "hypothesis>=6.170.2",
+    "mypy>=2.4.0",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "pytest-randomly>=5.0.0",
+    "ruff>=0.17.1",
+    "time-machine>=3.5.1",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = [
+    "E", "W", "F", "I", "B", "UP", "S", "SIM",
+    "RUF", "PT", "DTZ", "N", "C4", "RET", "PERF",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+files = ["src", "tests"]
+plugins = ["pydantic.mypy"]
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
+
+[tool.pytest]
+testpaths = ["tests"]
+addopts = ["-ra", "--strict-markers", "--strict-config"]
+filterwarnings = ["error"]
