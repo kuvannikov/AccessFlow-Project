@@ -5,7 +5,9 @@ description = "Backend API of the employee onboarding and offboarding platform."
 requires-python = ">=3.14"
 dependencies = [
     "fastapi>=0.148.0",
+    "psycopg[binary]>=3.3.6",
     "pydantic-settings>=2.16.0",
+    "sqlalchemy>=2.1.3",
     "uvicorn>=0.54.0",
 ]
 

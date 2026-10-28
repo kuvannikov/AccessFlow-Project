@@ -86,23 +86,32 @@ uv sync --frozen
 
 ### Run
 
-The API needs one environment variable, `ACCESSFLOW_ENVIRONMENT`
-(`development`, `test` or `production`). Without it the application refuses
-to start. The variable is read from the process environment, not from `.env`.
+The API reads its settings from `ACCESSFLOW_*` environment variables:
+`ACCESSFLOW_ENVIRONMENT` (`development`, `test` or `production`) and the
+`ACCESSFLOW_DATABASE_*` connection settings listed in `.env.example`. The port
+defaults to 5432; every other variable is required, and without it the
+application refuses to start. The API connects as `accessflow_app`, which can
+read and change data but not the schema.
+
+The application itself does not read `.env`; `uv run --env-file` loads it into
+the process environment. Start the dev stack (`make up`) first, then:
 
 ```bash
 cd backend
-ACCESSFLOW_ENVIRONMENT=development uv run --frozen uvicorn accessflow.app:create_app \
+uv run --frozen --env-file ../.env uvicorn accessflow.app:create_app \
   --factory --host 127.0.0.1 --port 8000 --no-access-log
 ```
 
-Check that it is alive:
+Check that the process is alive and that it reaches the database:
 
 ```bash
 curl -i http://127.0.0.1:8000/api/health
+curl -i http://127.0.0.1:8000/api/ready
 ```
 
-The answer is `200 OK` with the body `{"status":"ok"}`.
+`/api/health` answers `200 OK` with `{"status":"ok"}` while the process runs.
+`/api/ready` answers the same only when the database is reachable, and
+`503` with the code `service.unavailable` otherwise.
 
 ### Checks
 
