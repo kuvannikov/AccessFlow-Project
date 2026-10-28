@@ -3,11 +3,12 @@
 # Run every check of the project (the frontend joins later).
 check: backend-check
 
-# Lint, format check, types and tests of the backend.
+# Lint, format check, types, module boundaries and tests of the backend.
 backend-check:
 	cd backend && uv run --frozen ruff check .
 	cd backend && uv run --frozen ruff format --check .
 	cd backend && uv run --frozen mypy
+	cd backend && uv run --frozen lint-imports
 	cd backend && uv run --frozen pytest
 
 # Start the dev stack and wait until both services are healthy.

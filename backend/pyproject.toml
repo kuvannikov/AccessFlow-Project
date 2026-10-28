@@ -20,6 +20,7 @@ build-backend = "uv_build"
 dev = [
     "httpx2>=2.14.0",
     "hypothesis>=6.170.2",
+    "import-linter>=2.15",
     "mypy>=2.4.0",
     "pytest>=9.1.1",
     "pytest-alembic>=0.13",
@@ -58,6 +59,41 @@ name = "ruff_format"
 type = "module"
 module = "ruff"
 options = "format REVISION_SCRIPT_FILENAME"
+
+[tool.importlinter]
+root_package = "accessflow"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "The application, modules and core are layers"
+type = "layers"
+layers = ["accessflow.app", "accessflow.modules", "accessflow.core"]
+
+[[tool.importlinter.contracts]]
+name = "Modules use each other only through service and schemas"
+type = "independence"
+modules = ["accessflow.modules.*"]
+ignore_imports = [
+    "accessflow.modules.** -> accessflow.modules.*.service",
+    "accessflow.modules.** -> accessflow.modules.*.schemas",
+]
+unmatched_ignore_imports_alerting = "none"
+
+# Direct imports only: services reach FastAPI through core.errors, and routers
+# reach SQLAlchemy through core.db, which is intended.
+[[tool.importlinter.contracts]]
+name = "Services do not depend on HTTP"
+type = "forbidden"
+source_modules = ["accessflow.modules.*.service"]
+forbidden_modules = ["fastapi", "starlette"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Routers do not query the database"
+type = "forbidden"
+source_modules = ["accessflow.modules.*.router"]
+forbidden_modules = ["sqlalchemy"]
+allow_indirect_imports = true
 
 [tool.mypy]
 python_version = "3.14"

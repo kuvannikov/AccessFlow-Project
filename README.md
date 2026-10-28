@@ -59,7 +59,7 @@ PostgreSQL roles:
 | `make ps`      | Show the state of the services                          |
 | `make logs`    | Follow the logs (stop with Ctrl+C)                      |
 | `make migrate` | Apply the database migrations as `accessflow_owner`     |
-| `make check`   | Lint, format check, types and tests of the backend      |
+| `make check`   | Lint, format, types, module boundaries, backend tests   |
 
 ### Data
 
@@ -146,8 +146,14 @@ Run from the repository root:
 make check
 ```
 
-It runs Ruff (lint and format check), mypy in strict mode and pytest. Warnings
-raised during tests are treated as errors.
+It runs Ruff (lint and format check), mypy in strict mode, import-linter and
+pytest. Warnings raised during tests are treated as errors.
+
+import-linter enforces the module boundaries declared in `backend/pyproject.toml`:
+`app` may import `modules` and `core`, `modules` may import `core`, never the
+other way round; a module uses another one only through its `service` and
+`schemas`; services do not import FastAPI or Starlette, and routers do not
+import SQLAlchemy directly.
 
 Database tests need a running Docker daemon. They start a disposable
 PostgreSQL 18 container on a random port, initialized by the same scripts as
