@@ -1,4 +1,4 @@
-.PHONY: up down logs ps check backend-check
+.PHONY: up down logs ps migrate check backend-check
 
 # Run every check of the project (the frontend joins later).
 check: backend-check
@@ -26,3 +26,9 @@ logs:
 # Show the state of the services.
 ps:
 	docker compose ps
+
+# Apply the migrations to the dev database as the schema owner. The API's own
+# connection settings come from .env; only the role and its password change.
+migrate:
+	cd backend && uv run --frozen --env-file ../.env sh -c \
+		'ACCESSFLOW_DATABASE_USER=accessflow_owner ACCESSFLOW_DATABASE_PASSWORD="$$ACCESSFLOW_OWNER_PASSWORD" alembic upgrade head'

@@ -52,13 +52,14 @@ PostgreSQL roles:
 
 ### Commands
 
-| Command      | What it does                                                    |
-|--------------|-----------------------------------------------------------------|
-| `make up`    | Start the services and wait until they are healthy              |
-| `make down`  | Stop and remove the containers; the data volume is kept         |
-| `make ps`    | Show the state of the services                                  |
-| `make logs`  | Follow the logs (stop with Ctrl+C)                              |
-| `make check` | Lint, format check, types and tests of the backend              |
+| Command        | What it does                                            |
+|----------------|---------------------------------------------------------|
+| `make up`      | Start the services and wait until they are healthy      |
+| `make down`    | Stop and remove the containers; the data volume is kept |
+| `make ps`      | Show the state of the services                          |
+| `make logs`    | Follow the logs (stop with Ctrl+C)                      |
+| `make migrate` | Apply the database migrations as `accessflow_owner`     |
+| `make check`   | Lint, format check, types and tests of the backend      |
 
 ### Data
 
@@ -112,6 +113,30 @@ curl -i http://127.0.0.1:8000/api/ready
 `/api/health` answers `200 OK` with `{"status":"ok"}` while the process runs.
 `/api/ready` answers the same only when the database is reachable, and
 `503` with the code `service.unavailable` otherwise.
+
+### Migrations
+
+The schema is changed only by Alembic migrations in `backend/migrations/`.
+They run as `accessflow_owner`, the owner of the `accessflow` database. Tables
+it creates are granted to `accessflow_app` for data access through default
+privileges; tables created by any other role would stay out of the API's reach.
+
+Apply the migrations to the dev database (the stack must be running):
+
+```bash
+make migrate
+```
+
+Create a new migration from the model changes, then review it before use:
+
+```bash
+cd backend
+uv run --frozen --env-file ../.env sh -c \
+  'ACCESSFLOW_DATABASE_USER=accessflow_owner ACCESSFLOW_DATABASE_PASSWORD="$ACCESSFLOW_OWNER_PASSWORD" alembic revision --autogenerate -m "describe the change"'
+```
+
+New files are formatted with Ruff automatically. Constraint and index names
+follow the naming convention in `accessflow/core/db.py`.
 
 ### Checks
 
