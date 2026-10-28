@@ -149,6 +149,14 @@ make check
 It runs Ruff (lint and format check), mypy in strict mode and pytest. Warnings
 raised during tests are treated as errors.
 
+Database tests need a running Docker daemon. They start a disposable
+PostgreSQL 18 container on a random port, initialized by the same scripts as
+the dev stack, and remove it afterwards; the dev stack and its data are never
+used. Migrations run as `accessflow_owner`, the tests connect as
+`accessflow_app`, and every test runs in a transaction that is rolled back.
+Migration tests (pytest-alembic) use a separate empty database in the same
+container.
+
 ### Errors and request diagnostics
 
 Every HTTP response includes `X-Request-ID`. Send one canonical UUID in this

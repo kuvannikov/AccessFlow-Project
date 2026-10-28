@@ -22,9 +22,11 @@ dev = [
     "hypothesis>=6.170.2",
     "mypy>=2.4.0",
     "pytest>=9.1.1",
+    "pytest-alembic>=0.13",
     "pytest-cov>=7.1.0",
     "pytest-randomly>=5.0.0",
     "ruff>=0.17.1",
+    "testcontainers[postgres]>=4.15",
     "time-machine>=3.5.1",
 ]
 
@@ -70,5 +72,7 @@ warn_required_dynamic_aliases = true
 
 [tool.pytest]
 testpaths = ["tests"]
-addopts = ["-ra", "--strict-markers", "--strict-config"]
+addopts = ["-ra", "--strict-markers", "--strict-config", "--test-alembic"]
+# Replaced by tests/test_migrations.py until the first revision exists.
+pytest_alembic_exclude = "single_head_revision"
 filterwarnings = ["error"]

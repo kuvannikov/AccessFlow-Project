@@ -1,6 +1,23 @@
-from sqlalchemy import CheckConstraint, Column, ForeignKey, Integer, MetaData, Table, Text
+import pytest
+from sqlalchemy import (
+    CheckConstraint,
+    Column,
+    Connection,
+    ForeignKey,
+    Integer,
+    MetaData,
+    Table,
+    Text,
+    text,
+)
+from sqlalchemy.exc import ProgrammingError
 
 from accessflow.core.db import NAMING_CONVENTION
+
+
+def test_api_role_cannot_change_schema(db_connection: Connection) -> None:
+    with pytest.raises(ProgrammingError, match="permission denied for schema public"):
+        db_connection.execute(text("CREATE TABLE probes (id integer)"))
 
 
 def test_constraint_names_follow_convention() -> None:
