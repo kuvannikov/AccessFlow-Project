@@ -1,8 +1,8 @@
 """Disposable Keycloak that imports the project realm, and its admin operations for tests."""
 
 import secrets
-from collections.abc import Iterator, Sequence
-from contextlib import contextmanager
+from collections.abc import Sequence
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -10,17 +10,17 @@ import httpx2
 from testcontainers.core.container import DockerContainer
 from testcontainers.core.wait_strategies import HttpWaitStrategy
 
+from scripts import create_dev_user
+from scripts.create_dev_user import ADMIN_USERNAME, REALM, REQUEST_TIMEOUT_SECONDS, NewUser
+
 IMAGE = "quay.io/keycloak/keycloak:26.8.0"
-REALM = "accessflow"
 REALM_FILE = Path(__file__).resolve().parents[3] / "infra" / "keycloak" / "realm-accessflow.json"
 WEB_CLIENT = "accessflow-web"
 # Has no audience mapper, so its tokens are not issued for the API.
 FOREIGN_CLIENT = "accessflow-tests"
 HTTP_PORT = 8080
 MANAGEMENT_PORT = 9000
-ADMIN_USERNAME = "admin"
 STARTUP_TIMEOUT_SECONDS = 120
-REQUEST_TIMEOUT_SECONDS = 10
 
 
 def keycloak_container(admin_password: str) -> DockerContainer:
@@ -51,28 +51,14 @@ class RealmUser:
 
 class KeycloakServer:
     def __init__(self, url: str, admin_password: str) -> None:
+        self.url = url
+        self.admin_password = admin_password
         self.issuer = f"{url}/realms/{REALM}"
         self.jwks_url = f"{self.issuer}/protocol/openid-connect/certs"
-        self._url = url
-        self._admin_password = admin_password
 
-    @contextmanager
-    def _admin(self) -> Iterator[httpx2.Client]:
+    def _admin(self) -> AbstractContextManager[httpx2.Client]:
         # A fresh admin token for every operation: tokens of the master realm live 60 seconds.
-        with httpx2.Client(
-            base_url=f"{self._url}/admin/realms/{REALM}", timeout=REQUEST_TIMEOUT_SECONDS
-        ) as client:
-            response = client.post(
-                f"{self._url}/realms/master/protocol/openid-connect/token",
-                data={
-                    "grant_type": "password",
-                    "client_id": "admin-cli",
-                    "username": ADMIN_USERNAME,
-                    "password": self._admin_password,
-                },
-            ).raise_for_status()
-            client.headers["Authorization"] = f"Bearer {response.json()['access_token']}"
-            yield client
+        return create_dev_user.admin_client(self.url, self.admin_password)
 
     def allow_password_grant(self, client_id: str) -> None:
         """Let the client issue tokens for a username and password, so tests need no browser."""
@@ -98,30 +84,24 @@ class KeycloakServer:
     def create_user(
         self, username: str, first_name: str, last_name: str, *, roles: Sequence[str] = ()
     ) -> RealmUser:
-        password = secrets.token_urlsafe(24)
+        user = NewUser(
+            username=username,
+            email=f"{username}@example.test",
+            first_name=first_name,
+            last_name=last_name,
+            password=secrets.token_urlsafe(24),
+            roles=tuple(roles),
+        )
         with self._admin() as admin:
-            # Keycloak refuses to sign in a user whose required profile fields are empty.
-            response = admin.post(
-                "/users",
-                json={
-                    "username": username,
-                    "email": f"{username}@example.test",
-                    "emailVerified": True,
-                    "firstName": first_name,
-                    "lastName": last_name,
-                    "enabled": True,
-                    "credentials": [{"type": "password", "value": password, "temporary": False}],
-                },
-            ).raise_for_status()
-            user_id = response.headers["Location"].rsplit("/", 1)[-1]
-            if roles:
-                representations = [
-                    admin.get(f"/roles/{role}").raise_for_status().json() for role in roles
-                ]
-                admin.post(
-                    f"/users/{user_id}/role-mappings/realm", json=representations
-                ).raise_for_status()
-        return RealmUser(id=user_id, username=username, password=password)
+            user_id = create_dev_user.create_user(admin, user)
+        return RealmUser(id=user_id, username=user.username, password=user.password)
+
+    def find_user(self, username: str) -> str | None:
+        """ID of the user with exactly this username, if there is one."""
+        with self._admin() as admin:
+            response = admin.get("/users", params={"username": username, "exact": "true"})
+            users = response.raise_for_status().json()
+        return users[0]["id"] if users else None
 
     def access_token(self, user: RealmUser, client_id: str = WEB_CLIENT) -> str:
         response = httpx2.post(

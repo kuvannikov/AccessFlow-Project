@@ -148,6 +148,28 @@ interface can decide what to show:
 
 The name is the `name` claim, or `preferred_username` when `name` is empty.
 
+### Development users
+
+The realm file has no users. Create them in the dev Keycloak while the stack
+is running:
+
+```bash
+cd backend
+uv run --frozen --env-file ../.env python scripts/create_dev_user.py \
+  --username a.smirnova --email a.smirnova@example.test \
+  --first-name Анна --last-name Смирнова --hr
+```
+
+The script signs in to the Admin API as `admin` with `KEYCLOAK_ADMIN_PASSWORD`
+and asks for the new user's password twice. The password is never printed or
+stored anywhere except Keycloak. Keycloak checks it against the realm policy
+(at least 12 characters) and creates nothing when it fails; an existing
+username or email is rejected with 409. Without `--hr` the user has no roles:
+`/api/me` answers them, and endpoints for HR return 403.
+
+To check the password, sign in to the account console at
+`http://localhost:8081/realms/accessflow/account`.
+
 ### Migrations
 
 The schema is changed only by Alembic migrations in `backend/migrations/`.

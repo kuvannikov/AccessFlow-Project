@@ -99,7 +99,7 @@ allow_indirect_imports = true
 [tool.mypy]
 python_version = "3.14"
 strict = true
-files = ["src", "tests", "migrations"]
+files = ["src", "scripts", "tests", "migrations"]
 plugins = ["pydantic.mypy"]
 
 [tool.pydantic-mypy]
