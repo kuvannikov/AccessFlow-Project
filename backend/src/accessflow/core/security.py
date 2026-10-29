@@ -1,11 +1,16 @@
-"""Verification of access tokens issued by the identity provider."""
+"""Access tokens of the identity provider and the principal they authenticate."""
 
-from typing import Any
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
+from typing import Annotated, Any
 
 import jwt
+from fastapi import Depends, HTTPException, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import PyJWK, PyJWKClient, PyJWKClientError, PyJWKSetError
 
 from accessflow.core.config import Settings
+from accessflow.core.errors import DomainError, ProblemDefinition
 
 ALGORITHM = "RS256"
 REQUIRED_CLAIMS = ["exp", "iat", "iss", "aud", "sub"]
@@ -13,14 +18,20 @@ CLOCK_SKEW_SECONDS = 30
 KEY_SET_LIFESPAN_SECONDS = 300
 KEY_SET_TIMEOUT_SECONDS = 5
 KEY_SET_REFRESH_COOLDOWN_SECONDS = 30
+DISPLAY_NAME_CLAIMS = ("name", "preferred_username")
 
 
 class InvalidAccessTokenError(Exception):
     """The token is malformed, expired or not issued for this API."""
 
 
-class IdentityProviderUnavailableError(Exception):
+class IdentityProviderUnavailableError(DomainError):
     """The signing keys of the identity provider cannot be loaded."""
+
+
+PROVIDER_UNAVAILABLE = ProblemDefinition(
+    503, "auth.provider_unavailable", "Identity provider unavailable"
+)
 
 
 class KeySetClient(PyJWKClient):
@@ -82,3 +93,65 @@ def create_token_verifier(settings: Settings) -> AccessTokenVerifier:
         cooldown_duration=KEY_SET_REFRESH_COOLDOWN_SECONDS,
     )
     return AccessTokenVerifier(keys, issuer=settings.auth_issuer, audience=settings.auth_audience)
+
+
+@dataclass(frozen=True)
+class Principal:
+    subject: str
+    display_name: str
+    roles: frozenset[str]
+
+
+def _display_name(claims: Mapping[str, Any]) -> str:
+    for name in DISPLAY_NAME_CLAIMS:
+        value = claims.get(name)
+        if isinstance(value, str) and value.strip():
+            return value
+    raise InvalidAccessTokenError
+
+
+def _realm_roles(claims: Mapping[str, Any]) -> frozenset[str]:
+    # A user without realm roles is still authenticated; only a malformed claim is rejected.
+    realm_access = claims.get("realm_access", {})
+    roles = realm_access.get("roles", []) if isinstance(realm_access, dict) else None
+    if not isinstance(roles, list) or not all(isinstance(role, str) for role in roles):
+        raise InvalidAccessTokenError
+    return frozenset(roles)
+
+
+def principal_from_claims(claims: Mapping[str, Any]) -> Principal:
+    return Principal(
+        subject=claims["sub"], display_name=_display_name(claims), roles=_realm_roles(claims)
+    )
+
+
+bearer_token = HTTPBearer()
+
+
+def get_principal(
+    request: Request,
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_token)],
+) -> Principal:
+    """Authenticate the request by its bearer token; a missing header is rejected earlier."""
+    verifier: AccessTokenVerifier = request.app.state.token_verifier
+    try:
+        return principal_from_claims(verifier.verify(credentials.credentials))
+    except InvalidAccessTokenError:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            headers={"WWW-Authenticate": 'Bearer error="invalid_token"'},
+        ) from None
+
+
+PrincipalDep = Annotated[Principal, Depends(get_principal)]
+
+
+def require_role(role: str) -> Callable[[Principal], Principal]:
+    """Dependency that admits only principals holding the given realm role."""
+
+    def check_role(principal: PrincipalDep) -> Principal:
+        if role not in principal.roles:
+            raise HTTPException(status.HTTP_403_FORBIDDEN)
+        return principal
+
+    return check_role

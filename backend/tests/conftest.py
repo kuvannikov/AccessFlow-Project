@@ -17,7 +17,7 @@ from accessflow.app import create_app
 from accessflow.core.config import Settings
 from accessflow.core.db import create_database_engine, get_session
 from tests.database import SelectCounter
-from tests.identity import ISSUER, JwksServer, SigningKey
+from tests.identity import ISSUER, JwksServer, SigningKey, with_jwks_url
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 INIT_SCRIPTS_DIR = BACKEND_DIR.parent / "infra" / "postgres" / "init"
@@ -75,6 +75,18 @@ def jwks_server(signing_key: SigningKey) -> Iterator[JwksServer]:
     with JwksServer() as server:
         server.keys = [signing_key.jwk]
         yield server
+
+
+@pytest.fixture
+def auth_settings(settings: Settings, jwks_server: JwksServer) -> Settings:
+    return with_jwks_url(settings, jwks_server.url)
+
+
+@pytest.fixture
+def auth_client(auth_settings: Settings) -> Iterator[TestClient]:
+    """Client of an application that verifies tokens against the local JWKS server."""
+    with TestClient(create_app(auth_settings)) as test_client:
+        yield test_client
 
 
 @pytest.fixture(scope="session")

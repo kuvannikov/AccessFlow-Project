@@ -11,8 +11,33 @@ from uuid import uuid4
 import jwt
 from cryptography.hazmat.primitives.asymmetric import rsa
 from jwt.algorithms import RSAAlgorithm
+from pydantic import HttpUrl
+
+from accessflow.core.config import Settings
 
 ISSUER = "https://id.invalid/realms/accessflow"
+
+
+def with_jwks_url(settings: Settings, url: str) -> Settings:
+    return settings.model_copy(update={"auth_jwks_url": HttpUrl(url)})
+
+
+def bearer(token: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token}"}
+
+
+def access_claims(issued_at: int) -> dict[str, Any]:
+    """Claims shaped like a Keycloak access token of an HR user."""
+    return {
+        "iss": ISSUER,
+        "aud": ["accessflow-api", "account"],
+        "sub": "5f0c7a52-3d3e-4f53-9d55-4a3d5c0b7f11",
+        "iat": issued_at,
+        "exp": issued_at + 300,
+        "name": "Анна Смирнова",
+        "preferred_username": "a.smirnova",
+        "realm_access": {"roles": ["default-roles-accessflow", "HR"]},
+    }
 
 
 class SigningKey:

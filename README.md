@@ -115,6 +115,38 @@ curl -i http://127.0.0.1:8000/api/ready
 `/api/ready` answers the same only when the database is reachable, and
 `503` with the code `service.unavailable` otherwise.
 
+### Authentication
+
+Every endpoint under `/api` except `/api/health` and `/api/ready` requires a
+Keycloak access token in the `Authorization: Bearer <token>` header. The API
+verifies the token against the realm's public signing keys
+(`ACCESSFLOW_AUTH_JWKS_URL`):
+
+- only RS256 is accepted; the algorithm and the key ID are checked before any
+  key is loaded;
+- `iss` must equal `ACCESSFLOW_AUTH_ISSUER` exactly, `aud` must include
+  `accessflow-api`, and `exp`, `iat`, `iss`, `aud` and `sub` are required;
+  clocks may differ by up to 30 seconds;
+- the keys are cached for 5 minutes; a token with an unknown key ID reloads
+  them at most once every 30 seconds; loading times out after 5 seconds.
+
+Roles come from `realm_access.roles` and must match exactly (`HR`, not `hr`).
+
+| Status | Code                        | When                                            |
+|--------|-----------------------------|-------------------------------------------------|
+| 401    | `auth.invalid_token`        | No token, or the token is invalid or expired    |
+| 403    | `auth.forbidden`            | Valid token, but the required role is missing   |
+| 503    | `auth.provider_unavailable` | The signing keys cannot be loaded from Keycloak |
+
+`GET /api/me` answers any signed-in user, with or without roles, so the
+interface can decide what to show:
+
+```json
+{"displayName": "Анна Смирнова", "roles": ["HR", "default-roles-accessflow"]}
+```
+
+The name is the `name` claim, or `preferred_username` when `name` is empty.
+
 ### Migrations
 
 The schema is changed only by Alembic migrations in `backend/migrations/`.

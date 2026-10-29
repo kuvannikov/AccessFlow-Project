@@ -6,7 +6,6 @@ from typing import Any
 import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import ec
-from pydantic import HttpUrl
 from time_machine import TimeMachineFixture
 
 from accessflow.core.config import Settings
@@ -15,9 +14,11 @@ from accessflow.core.security import (
     IdentityProviderUnavailableError,
     InvalidAccessTokenError,
     KeySetClient,
+    Principal,
     create_token_verifier,
+    principal_from_claims,
 )
-from tests.identity import ISSUER, JwksServer, SigningKey
+from tests.identity import ISSUER, JwksServer, SigningKey, access_claims, with_jwks_url
 
 NOW = datetime(2026, 10, 29, 12, 0, tzinfo=UTC)
 ISSUED_AT = int(NOW.timestamp())
@@ -30,22 +31,12 @@ def frozen_time(time_machine: TimeMachineFixture) -> None:
 
 @pytest.fixture
 def claims() -> dict[str, Any]:
-    return {
-        "iss": ISSUER,
-        "aud": ["accessflow-api", "account"],
-        "sub": "5f0c7a52-3d3e-4f53-9d55-4a3d5c0b7f11",
-        "iat": ISSUED_AT,
-        "exp": ISSUED_AT + 300,
-    }
-
-
-def verifier_for(settings: Settings, url: str) -> AccessTokenVerifier:
-    return create_token_verifier(settings.model_copy(update={"auth_jwks_url": HttpUrl(url)}))
+    return access_claims(ISSUED_AT)
 
 
 @pytest.fixture
-def verifier(settings: Settings, jwks_server: JwksServer) -> AccessTokenVerifier:
-    return verifier_for(settings, jwks_server.url)
+def verifier(auth_settings: Settings) -> AccessTokenVerifier:
+    return create_token_verifier(auth_settings)
 
 
 def sign_with(algorithm: str, claims: dict[str, Any], signing_key: SigningKey) -> str:
@@ -215,7 +206,9 @@ def test_key_set_reload_is_rate_limited(
 def test_unreachable_key_set_is_unavailable(
     settings: Settings, closed_port: int, signing_key: SigningKey, claims: dict[str, Any]
 ) -> None:
-    verifier = verifier_for(settings, f"http://127.0.0.1:{closed_port}/certs")
+    verifier = create_token_verifier(
+        with_jwks_url(settings, f"http://127.0.0.1:{closed_port}/certs")
+    )
 
     with pytest.raises(IdentityProviderUnavailableError):
         verifier.verify(signing_key.sign(claims))
@@ -268,3 +261,61 @@ def test_key_set_without_signing_keys_is_unavailable(
 
     with pytest.raises(IdentityProviderUnavailableError):
         verifier.verify(signing_key.sign(claims))
+
+
+def test_principal_from_claims(claims: dict[str, Any]) -> None:
+    assert principal_from_claims(claims) == Principal(
+        subject="5f0c7a52-3d3e-4f53-9d55-4a3d5c0b7f11",
+        display_name="Анна Смирнова",
+        roles=frozenset({"default-roles-accessflow", "HR"}),
+    )
+
+
+@pytest.mark.parametrize("name", [None, "", "   ", 42])
+def test_display_name_falls_back_to_username(claims: dict[str, Any], name: object) -> None:
+    claims["name"] = name
+
+    assert principal_from_claims(claims).display_name == "a.smirnova"
+
+
+def test_principal_without_any_name_is_rejected(claims: dict[str, Any]) -> None:
+    del claims["name"], claims["preferred_username"]
+
+    with pytest.raises(InvalidAccessTokenError):
+        principal_from_claims(claims)
+
+
+@pytest.mark.parametrize(
+    "realm_access",
+    [{}, {"roles": []}],
+    ids=["without roles", "empty roles"],
+)
+def test_principal_without_realm_roles_has_no_roles(
+    claims: dict[str, Any], realm_access: dict[str, Any]
+) -> None:
+    claims["realm_access"] = realm_access
+
+    assert principal_from_claims(claims).roles == frozenset()
+
+
+def test_principal_without_realm_access_has_no_roles(claims: dict[str, Any]) -> None:
+    del claims["realm_access"]
+
+    assert principal_from_claims(claims).roles == frozenset()
+
+
+@pytest.mark.parametrize(
+    "realm_access",
+    [
+        pytest.param("HR", id="claim not an object"),
+        pytest.param({"roles": "HR"}, id="roles not a list"),
+        pytest.param({"roles": None}, id="roles null"),
+        pytest.param({"roles": ["HR", 1]}, id="role not a string"),
+        pytest.param({"roles": [["HR"]]}, id="nested list"),
+    ],
+)
+def test_malformed_roles_are_rejected(claims: dict[str, Any], realm_access: object) -> None:
+    claims["realm_access"] = realm_access
+
+    with pytest.raises(InvalidAccessTokenError):
+        principal_from_claims(claims)

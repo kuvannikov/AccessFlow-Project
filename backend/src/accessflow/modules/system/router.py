@@ -1,8 +1,9 @@
 from fastapi import APIRouter, HTTPException, status
 
 from accessflow.core.db import SessionDep
+from accessflow.core.security import PrincipalDep
 from accessflow.modules.system import service
-from accessflow.modules.system.schemas import StatusResponse
+from accessflow.modules.system.schemas import CurrentUserResponse, StatusResponse
 
 router = APIRouter(prefix="/api", tags=["system"])
 
@@ -19,3 +20,9 @@ def ready(session: SessionDep) -> StatusResponse:
     if not service.database_is_available(session):
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE)
     return StatusResponse(status="ok")
+
+
+@router.get("/me")
+def me(principal: PrincipalDep) -> CurrentUserResponse:
+    """The signed-in user's name and roles. Any authenticated user may call it."""
+    return CurrentUserResponse(display_name=principal.display_name, roles=sorted(principal.roles))
