@@ -7,7 +7,7 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
-from pydantic import SecretStr
+from pydantic import HttpUrl, SecretStr
 from sqlalchemy import Connection, Engine, create_engine, text
 from sqlalchemy.event import listen, remove
 from sqlalchemy.orm import Session
@@ -17,9 +17,31 @@ from accessflow.app import create_app
 from accessflow.core.config import Settings
 from accessflow.core.db import create_database_engine, get_session
 from tests.database import SelectCounter
+from tests.identity import ISSUER, JwksServer, SigningKey
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 INIT_SCRIPTS_DIR = BACKEND_DIR.parent / "infra" / "postgres" / "init"
+
+
+def make_settings(
+    *,
+    host: str,
+    port: int,
+    password: SecretStr,
+    database: str = "accessflow",
+    user: str = "accessflow_app",
+) -> Settings:
+    # The ".invalid" domain never resolves, so no test reaches a real identity provider.
+    return Settings(
+        environment="test",
+        database_host=host,
+        database_port=port,
+        database_name=database,
+        database_user=user,
+        database_password=password,
+        auth_issuer=ISSUER,
+        auth_jwks_url=HttpUrl(f"{ISSUER}/protocol/openid-connect/certs"),
+    )
 
 
 @pytest.fixture
@@ -34,20 +56,25 @@ def closed_port() -> int:
 def settings(closed_port: int) -> Settings:
     # Nothing listens on the database port, so a test that needs a real
     # database fails fast instead of reaching the dev stack.
-    return Settings(
-        environment="test",
-        database_host="127.0.0.1",
-        database_port=closed_port,
-        database_name="accessflow",
-        database_user="accessflow_app",
-        database_password=SecretStr("unused"),
-    )
+    return make_settings(host="127.0.0.1", port=closed_port, password=SecretStr("unused"))
 
 
 @pytest.fixture
 def client(settings: Settings) -> Iterator[TestClient]:
     with TestClient(create_app(settings)) as test_client:
         yield test_client
+
+
+@pytest.fixture(scope="session")
+def signing_key() -> SigningKey:
+    return SigningKey()
+
+
+@pytest.fixture
+def jwks_server(signing_key: SigningKey) -> Iterator[JwksServer]:
+    with JwksServer() as server:
+        server.keys = [signing_key.jwk]
+        yield server
 
 
 @pytest.fixture(scope="session")
@@ -68,13 +95,12 @@ def database_settings(
     postgres: PostgresContainer, role: str, database: str = "accessflow"
 ) -> Settings:
     password_variable = f"{role.upper()}_PASSWORD"
-    return Settings(
-        environment="test",
-        database_host=postgres.get_container_host_ip(),
-        database_port=postgres.get_exposed_port(5432),
-        database_name=database,
-        database_user=role,
-        database_password=SecretStr(postgres.env[password_variable]),
+    return make_settings(
+        host=postgres.get_container_host_ip(),
+        port=postgres.get_exposed_port(5432),
+        password=SecretStr(postgres.env[password_variable]),
+        database=database,
+        user=role,
     )
 
 

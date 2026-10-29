@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import Field, SecretStr
+from pydantic import Field, HttpUrl, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -22,3 +22,8 @@ class Settings(BaseSettings):
     database_name: str
     database_user: str
     database_password: SecretStr
+    # Compared with the "iss" claim character for character, so it is not
+    # normalized as a URL.
+    auth_issuer: str = Field(min_length=1)
+    auth_audience: str = Field(default="accessflow-api", min_length=1)
+    auth_jwks_url: HttpUrl

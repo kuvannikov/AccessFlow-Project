@@ -88,11 +88,12 @@ uv sync --frozen
 ### Run
 
 The API reads its settings from `ACCESSFLOW_*` environment variables:
-`ACCESSFLOW_ENVIRONMENT` (`development`, `test` or `production`) and the
-`ACCESSFLOW_DATABASE_*` connection settings listed in `.env.example`. The port
-defaults to 5432; every other variable is required, and without it the
-application refuses to start. The API connects as `accessflow_app`, which can
-read and change data but not the schema.
+`ACCESSFLOW_ENVIRONMENT` (`development`, `test` or `production`), the
+`ACCESSFLOW_DATABASE_*` connection settings and the `ACCESSFLOW_AUTH_*` access
+token settings listed in `.env.example`. The database port defaults to 5432 and
+the token audience `ACCESSFLOW_AUTH_AUDIENCE` to `accessflow-api`; every other
+variable is required, and without it the application refuses to start. The API
+connects as `accessflow_app`, which can read and change data but not the schema.
 
 The application itself does not read `.env`; `uv run --env-file` loads it into
 the process environment. Start the dev stack (`make up`) first, then:

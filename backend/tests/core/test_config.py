@@ -9,6 +9,8 @@ REQUIRED_VARIABLES = {
     "ACCESSFLOW_DATABASE_NAME": "accessflow",
     "ACCESSFLOW_DATABASE_USER": "accessflow_app",
     "ACCESSFLOW_DATABASE_PASSWORD": "private-password",
+    "ACCESSFLOW_AUTH_ISSUER": "https://id.example.test/realms/accessflow",
+    "ACCESSFLOW_AUTH_JWKS_URL": "https://id.example.test/realms/accessflow/certs",
 }
 
 
@@ -17,6 +19,7 @@ def environment(monkeypatch: pytest.MonkeyPatch) -> None:
     for name, value in REQUIRED_VARIABLES.items():
         monkeypatch.setenv(name, value)
     monkeypatch.delenv("ACCESSFLOW_DATABASE_PORT", raising=False)
+    monkeypatch.delenv("ACCESSFLOW_AUTH_AUDIENCE", raising=False)
 
 
 def test_reads_settings_from_environment() -> None:
@@ -26,6 +29,15 @@ def test_reads_settings_from_environment() -> None:
     assert settings.database_host == "db.example.test"
     assert settings.database_port == 5432
     assert settings.database_password.get_secret_value() == "private-password"
+    assert settings.auth_issuer == "https://id.example.test/realms/accessflow"
+    assert settings.auth_audience == "accessflow-api"
+    assert str(settings.auth_jwks_url) == "https://id.example.test/realms/accessflow/certs"
+
+
+def test_issuer_is_kept_verbatim(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ACCESSFLOW_AUTH_ISSUER", "https://id.example.test")
+
+    assert Settings().auth_issuer == "https://id.example.test"
 
 
 @pytest.mark.parametrize("name", REQUIRED_VARIABLES)
@@ -38,7 +50,12 @@ def test_missing_variable_fails(monkeypatch: pytest.MonkeyPatch, name: str) -> N
 
 @pytest.mark.parametrize(
     ("name", "value"),
-    [("ACCESSFLOW_ENVIRONMENT", "staging"), ("ACCESSFLOW_DATABASE_PORT", "70000")],
+    [
+        ("ACCESSFLOW_ENVIRONMENT", "staging"),
+        ("ACCESSFLOW_DATABASE_PORT", "70000"),
+        ("ACCESSFLOW_AUTH_ISSUER", ""),
+        ("ACCESSFLOW_AUTH_JWKS_URL", "file:///etc/passwd"),
+    ],
 )
 def test_invalid_value_fails(monkeypatch: pytest.MonkeyPatch, name: str, value: str) -> None:
     monkeypatch.setenv(name, value)

@@ -1,0 +1,270 @@
+import secrets
+from datetime import UTC, datetime
+from http import HTTPStatus
+from typing import Any
+
+import jwt
+import pytest
+from cryptography.hazmat.primitives.asymmetric import ec
+from pydantic import HttpUrl
+from time_machine import TimeMachineFixture
+
+from accessflow.core.config import Settings
+from accessflow.core.security import (
+    AccessTokenVerifier,
+    IdentityProviderUnavailableError,
+    InvalidAccessTokenError,
+    KeySetClient,
+    create_token_verifier,
+)
+from tests.identity import ISSUER, JwksServer, SigningKey
+
+NOW = datetime(2026, 10, 29, 12, 0, tzinfo=UTC)
+ISSUED_AT = int(NOW.timestamp())
+
+
+@pytest.fixture(autouse=True)
+def frozen_time(time_machine: TimeMachineFixture) -> None:
+    time_machine.move_to(NOW, tick=False)
+
+
+@pytest.fixture
+def claims() -> dict[str, Any]:
+    return {
+        "iss": ISSUER,
+        "aud": ["accessflow-api", "account"],
+        "sub": "5f0c7a52-3d3e-4f53-9d55-4a3d5c0b7f11",
+        "iat": ISSUED_AT,
+        "exp": ISSUED_AT + 300,
+    }
+
+
+def verifier_for(settings: Settings, url: str) -> AccessTokenVerifier:
+    return create_token_verifier(settings.model_copy(update={"auth_jwks_url": HttpUrl(url)}))
+
+
+@pytest.fixture
+def verifier(settings: Settings, jwks_server: JwksServer) -> AccessTokenVerifier:
+    return verifier_for(settings, jwks_server.url)
+
+
+def sign_with(algorithm: str, claims: dict[str, Any], signing_key: SigningKey) -> str:
+    key: Any
+    match algorithm:
+        case "none":
+            key = ""
+        case "HS256":
+            key = secrets.token_bytes(32)
+        case "ES256":
+            key = ec.generate_private_key(ec.SECP256R1())
+        case _:
+            return signing_key.sign(claims, algorithm=algorithm)
+    return jwt.encode(claims, key, algorithm=algorithm, headers={"kid": signing_key.kid})
+
+
+@pytest.mark.parametrize("audience", ["accessflow-api", ["account", "accessflow-api"]])
+def test_accepts_valid_token(
+    verifier: AccessTokenVerifier,
+    signing_key: SigningKey,
+    claims: dict[str, Any],
+    audience: str | list[str],
+) -> None:
+    claims["aud"] = audience
+
+    assert verifier.verify(signing_key.sign(claims)) == claims
+
+
+def test_caches_key_set(
+    verifier: AccessTokenVerifier,
+    jwks_server: JwksServer,
+    signing_key: SigningKey,
+    claims: dict[str, Any],
+) -> None:
+    for _ in range(3):
+        verifier.verify(signing_key.sign(claims))
+
+    assert jwks_server.requests == 1
+
+
+@pytest.mark.parametrize("algorithm", ["none", "HS256", "RS512", "PS256", "ES256"])
+def test_rejects_other_algorithm_without_key_lookup(
+    verifier: AccessTokenVerifier,
+    jwks_server: JwksServer,
+    signing_key: SigningKey,
+    claims: dict[str, Any],
+    algorithm: str,
+) -> None:
+    token = sign_with(algorithm, claims, signing_key)
+
+    with pytest.raises(InvalidAccessTokenError):
+        verifier.verify(token)
+    assert jwks_server.requests == 0
+
+
+def test_rejects_token_without_key_id_without_key_lookup(
+    verifier: AccessTokenVerifier,
+    jwks_server: JwksServer,
+    signing_key: SigningKey,
+    claims: dict[str, Any],
+) -> None:
+    token = jwt.encode(claims, signing_key.private_key, algorithm="RS256")
+
+    with pytest.raises(InvalidAccessTokenError):
+        verifier.verify(token)
+    assert jwks_server.requests == 0
+
+
+@pytest.mark.parametrize("token", ["", "not-a-token", "a.b.c", "e30.e30."])
+def test_rejects_malformed_token(verifier: AccessTokenVerifier, token: str) -> None:
+    with pytest.raises(InvalidAccessTokenError):
+        verifier.verify(token)
+
+
+def test_rejects_signature_of_another_key(
+    verifier: AccessTokenVerifier, signing_key: SigningKey, claims: dict[str, Any]
+) -> None:
+    forged = jwt.encode(
+        claims, SigningKey().private_key, algorithm="RS256", headers={"kid": signing_key.kid}
+    )
+
+    with pytest.raises(InvalidAccessTokenError):
+        verifier.verify(forged)
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        pytest.param({"iss": "https://id.invalid/realms/other"}, id="other issuer"),
+        pytest.param({"iss": f"{ISSUER}/"}, id="issuer with trailing slash"),
+        pytest.param({"aud": "account"}, id="other audience"),
+        pytest.param({"aud": ["account", "accessflow-web"]}, id="audience list without api"),
+        pytest.param({"exp": ISSUED_AT - 31}, id="expired"),
+        pytest.param({"iat": ISSUED_AT + 31}, id="issued in the future"),
+        pytest.param({"sub": 42}, id="subject not a string"),
+    ],
+)
+def test_rejects_invalid_claims(
+    verifier: AccessTokenVerifier,
+    signing_key: SigningKey,
+    claims: dict[str, Any],
+    changes: dict[str, Any],
+) -> None:
+    with pytest.raises(InvalidAccessTokenError):
+        verifier.verify(signing_key.sign(claims | changes))
+
+
+@pytest.mark.parametrize("claim", ["exp", "iat", "iss", "aud", "sub"])
+def test_rejects_token_without_required_claim(
+    verifier: AccessTokenVerifier,
+    signing_key: SigningKey,
+    claims: dict[str, Any],
+    claim: str,
+) -> None:
+    del claims[claim]
+
+    with pytest.raises(InvalidAccessTokenError):
+        verifier.verify(signing_key.sign(claims))
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        pytest.param({"exp": ISSUED_AT - 29}, id="expired within skew"),
+        pytest.param({"iat": ISSUED_AT + 29}, id="issued within skew"),
+    ],
+)
+def test_tolerates_clock_skew(
+    verifier: AccessTokenVerifier,
+    signing_key: SigningKey,
+    claims: dict[str, Any],
+    changes: dict[str, Any],
+) -> None:
+    claims |= changes
+
+    assert verifier.verify(signing_key.sign(claims)) == claims
+
+
+def test_unknown_key_id_reloads_key_set(
+    jwks_server: JwksServer, signing_key: SigningKey, claims: dict[str, Any]
+) -> None:
+    keys = KeySetClient(jwks_server.url, cooldown_duration=0)
+    verifier = AccessTokenVerifier(keys, issuer=ISSUER, audience="accessflow-api")
+    verifier.verify(signing_key.sign(claims))
+    rotated = SigningKey()
+    jwks_server.keys = [rotated.jwk]
+
+    assert verifier.verify(rotated.sign(claims)) == claims
+    assert jwks_server.requests == 2
+
+
+def test_key_set_reload_is_rate_limited(
+    verifier: AccessTokenVerifier,
+    jwks_server: JwksServer,
+    signing_key: SigningKey,
+    claims: dict[str, Any],
+) -> None:
+    verifier.verify(signing_key.sign(claims))
+    unknown = SigningKey()
+
+    for _ in range(3):
+        with pytest.raises(InvalidAccessTokenError):
+            verifier.verify(unknown.sign(claims))
+    assert jwks_server.requests == 1
+
+
+def test_unreachable_key_set_is_unavailable(
+    settings: Settings, closed_port: int, signing_key: SigningKey, claims: dict[str, Any]
+) -> None:
+    verifier = verifier_for(settings, f"http://127.0.0.1:{closed_port}/certs")
+
+    with pytest.raises(IdentityProviderUnavailableError):
+        verifier.verify(signing_key.sign(claims))
+
+
+def test_key_set_timeout_is_unavailable(
+    jwks_server: JwksServer, signing_key: SigningKey, claims: dict[str, Any]
+) -> None:
+    jwks_server.stalled = True
+    keys = KeySetClient(jwks_server.url, timeout=0.2)
+    verifier = AccessTokenVerifier(keys, issuer=ISSUER, audience="accessflow-api")
+
+    with pytest.raises(IdentityProviderUnavailableError):
+        verifier.verify(signing_key.sign(claims))
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        pytest.param((HTTPStatus.SERVICE_UNAVAILABLE, b""), id="error status"),
+        pytest.param((HTTPStatus.OK, b"<html></html>"), id="not json"),
+        pytest.param((HTTPStatus.OK, b"[]"), id="not an object"),
+        pytest.param((HTTPStatus.OK, b'{"keys": []}'), id="no keys"),
+        pytest.param(
+            (HTTPStatus.OK, b'{"keys": [{"kty": "RSA", "use": "enc", "kid": "x"}]}'),
+            id="no usable keys",
+        ),
+    ],
+)
+def test_broken_key_set_is_unavailable(
+    verifier: AccessTokenVerifier,
+    jwks_server: JwksServer,
+    signing_key: SigningKey,
+    claims: dict[str, Any],
+    response: tuple[HTTPStatus, bytes],
+) -> None:
+    jwks_server.response = response
+
+    with pytest.raises(IdentityProviderUnavailableError):
+        verifier.verify(signing_key.sign(claims))
+
+
+def test_key_set_without_signing_keys_is_unavailable(
+    verifier: AccessTokenVerifier,
+    jwks_server: JwksServer,
+    signing_key: SigningKey,
+    claims: dict[str, Any],
+) -> None:
+    jwks_server.keys = [{**signing_key.jwk, "use": "enc"}]
+
+    with pytest.raises(IdentityProviderUnavailableError):
+        verifier.verify(signing_key.sign(claims))
