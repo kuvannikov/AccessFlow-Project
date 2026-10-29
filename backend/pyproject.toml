@@ -109,7 +109,11 @@ warn_required_dynamic_aliases = true
 
 [tool.pytest]
 testpaths = ["tests"]
-addopts = ["-ra", "--strict-markers", "--strict-config", "--test-alembic"]
+# Keycloak tests start a container of their own and run separately: make test-keycloak.
+addopts = [
+    "-ra", "--strict-markers", "--strict-config", "--test-alembic", "-m", "not keycloak",
+]
+markers = ["keycloak: needs a disposable Keycloak container"]
 # Replaced by tests/test_migrations.py until the first revision exists.
 pytest_alembic_exclude = "single_head_revision"
 filterwarnings = ["error"]

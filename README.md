@@ -52,14 +52,15 @@ PostgreSQL roles:
 
 ### Commands
 
-| Command        | What it does                                            |
-|----------------|---------------------------------------------------------|
-| `make up`      | Start the services and wait until they are healthy      |
-| `make down`    | Stop and remove the containers; the data volume is kept |
-| `make ps`      | Show the state of the services                          |
-| `make logs`    | Follow the logs (stop with Ctrl+C)                      |
-| `make migrate` | Apply the database migrations as `accessflow_owner`     |
-| `make check`   | Lint, format, types, module boundaries, backend tests   |
+| Command              | What it does                                            |
+|----------------------|---------------------------------------------------------|
+| `make up`            | Start the services and wait until they are healthy      |
+| `make down`          | Stop and remove the containers; the data volume is kept |
+| `make ps`            | Show the state of the services                          |
+| `make logs`          | Follow the logs (stop with Ctrl+C)                      |
+| `make migrate`       | Apply the database migrations as `accessflow_owner`     |
+| `make check`         | Lint, format, types, module boundaries, backend tests   |
+| `make test-keycloak` | Backend tests against a disposable Keycloak             |
 
 ### Data
 
@@ -195,6 +196,20 @@ used. Migrations run as `accessflow_owner`, the tests connect as
 `accessflow_app`, and every test runs in a transaction that is rolled back.
 Migration tests (pytest-alembic) use a separate empty database in the same
 container.
+
+`make check` leaves out the tests marked `keycloak`; run them with:
+
+```bash
+make test-keycloak
+```
+
+They start a disposable Keycloak 26.8 container on a random port that imports
+`infra/keycloak/realm-accessflow.json`, create test users with random
+passwords through the Admin API and call the API with the access tokens
+Keycloak issues to them. Signing in with a username and password is a test-only
+addition made inside that container: it is enabled for `accessflow-web`, and a
+second client, `accessflow-tests`, issues tokens without the `accessflow-api`
+audience. The realm file itself has neither users nor password sign-in.
 
 ### Errors and request diagnostics
 

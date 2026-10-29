@@ -1,30 +1,18 @@
 import time
 from collections.abc import Iterator
-from typing import Annotated, Any
+from typing import Any
 
 import pytest
-from fastapi import Depends
 from fastapi.testclient import TestClient
 
-from accessflow.app import create_app
 from accessflow.core.config import Settings
-from accessflow.core.security import Principal, require_role
+from tests.authorization import protected_client
 from tests.identity import SigningKey, access_claims, bearer, with_jwks_url
 
 
 @pytest.fixture
 def claims() -> dict[str, Any]:
     return access_claims(int(time.time()))
-
-
-def protected_client(settings: Settings) -> TestClient:
-    app = create_app(settings)
-
-    @app.get("/test/hr")
-    def hr_only(principal: Annotated[Principal, Depends(require_role("HR"))]) -> dict[str, str]:
-        return {"subject": principal.subject}
-
-    return TestClient(app)
 
 
 @pytest.fixture
