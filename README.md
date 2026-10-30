@@ -365,7 +365,8 @@ change.
 exactly the versions from `pnpm-lock.yaml` and fails if the lockfile does not
 match `package.json`, checks formatting with Prettier, lints the code with
 ESLint and the styles with Stylelint, type-checks the code with the TypeScript
-compiler in strict mode, runs the tests and builds the production bundle into
+compiler in strict mode, checks for unused files, exports and dependencies with
+Knip, runs the tests and builds the production bundle into
 `frontend/dist`. ESLint fails on warnings as well as errors.
 
 To fix formatting, run `pnpm format` in `frontend/`.
@@ -385,3 +386,25 @@ keyboard behave there as in a real browser. Tests live next to the code they
 cover. To run one project, use `pnpm test --project unit` or
 `pnpm test --project browser` in `frontend/`. Screenshots of failed browser
 tests are saved to `frontend/.vitest/attachments`.
+
+## Continuous integration
+
+The CI workflow runs on every push to `main` and can also be started manually
+from the repository's Actions tab. Backend and frontend checks run in separate
+jobs on Ubuntu 24.04:
+
+- Backend runs `make backend-check` and `make test-keycloak`. Testcontainers
+  uses the runner's Docker daemon for disposable PostgreSQL and Keycloak
+  containers; no development services or environment file are needed.
+- Frontend runs `make frontend-check`, including Knip and browser tests.
+  Chromium and its system dependencies are installed before the checks.
+
+Node.js comes from `.nvmrc`, pnpm from `frontend/package.json`, and Python
+from `backend/.python-version`; uv is pinned in the workflow. Dependency caches
+use the lockfiles, and the browser cache uses the frontend lockfile. Actions
+are pinned to full commit hashes. A newer run on the same branch cancels an
+older run of this workflow.
+
+Open a run in Actions, select the failed job and expand its failed step to
+read the command output. A local `make check` does not run the separate
+Keycloak tests; run `make test-keycloak` as well before checking the CI result.

@@ -16,6 +16,7 @@ frontend-check:
 	cd frontend && pnpm lint
 	cd frontend && pnpm lint:css
 	cd frontend && pnpm typecheck
+	cd frontend && pnpm knip
 	cd frontend && pnpm test
 	cd frontend && pnpm build
 
