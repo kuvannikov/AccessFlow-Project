@@ -1,24 +1,31 @@
-.PHONY: up down logs ps migrate web check backend-check frontend-check test-keycloak
+.PHONY: up down logs ps migrate web test-keycloak
+.PHONY: check check-fast backend-check backend-lint frontend-check frontend-lint
 
 check: backend-check frontend-check
 
-backend-check:
+check-fast: backend-lint frontend-lint
+
+backend-check: backend-lint
+	cd backend && uv run --frozen pytest
+
+backend-lint:
 	cd backend && uv lock --check
 	cd backend && uv run --frozen ruff check .
 	cd backend && uv run --frozen ruff format --check .
 	cd backend && uv run --frozen mypy
 	cd backend && uv run --frozen lint-imports
-	cd backend && uv run --frozen pytest
 
-frontend-check:
+frontend-check: frontend-lint
+	cd frontend && pnpm test
+	cd frontend && pnpm build
+
+frontend-lint:
 	cd frontend && pnpm install --frozen-lockfile
 	cd frontend && pnpm format:check
 	cd frontend && pnpm lint
 	cd frontend && pnpm lint:css
 	cd frontend && pnpm typecheck
 	cd frontend && pnpm knip
-	cd frontend && pnpm test
-	cd frontend && pnpm build
 
 test-keycloak:
 	cd backend && uv run --frozen pytest -m keycloak

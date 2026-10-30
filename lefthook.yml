@@ -1,0 +1,33 @@
+lefthook: pnpm --dir frontend hooks
+no_auto_install: true
+
+pre-commit:
+  parallel: true
+  jobs:
+    - name: ruff
+      root: backend/
+      glob: '*.py'
+      run: uv run --frozen ruff check -- {staged_files}
+    - name: ruff-format
+      root: backend/
+      glob: '*.py'
+      run: uv run --frozen ruff format --check -- {staged_files}
+    - name: prettier
+      root: frontend/
+      glob: '*.{css,html,js,json,md,ts,tsx,yaml,yml}'
+      run: pnpm exec prettier --check -- {staged_files}
+    - name: eslint
+      root: frontend/
+      glob: '*.{js,ts,tsx}'
+      run: pnpm exec eslint --max-warnings 0 -- {staged_files}
+    - name: stylelint
+      root: frontend/
+      glob: '*.css'
+      run: pnpm exec stylelint -- {staged_files}
+    - name: gitleaks
+      run: gitleaks git --staged --redact=100 --no-banner --no-color
+
+pre-push:
+  jobs:
+    - name: check-fast
+      run: make check-fast

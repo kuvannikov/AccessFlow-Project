@@ -63,6 +63,7 @@ PostgreSQL roles:
 | `make migrate`       | Apply the database migrations as `accessflow_owner`     |
 | `make web`           | Start the frontend dev server                           |
 | `make check`         | All backend and frontend checks                         |
+| `make check-fast`    | Formatting, lint, types and unused-code checks           |
 | `make test-keycloak` | Backend tests against a disposable Keycloak             |
 
 ### Data
@@ -433,3 +434,51 @@ Enable Dependabot alerts in the repository's Settings → Advanced Security →
 Dependabot alerts. Enable the dependency graph if GitHub asks for it. Alerts
 complement the scheduled scan; dependency updates remain manual.
 See [GitHub's instructions](https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/secure-your-dependencies/configure-dependabot-alerts).
+
+### Local Git hooks
+
+Lefthook is pinned in `frontend/package.json`. Gitleaks must be available on
+`PATH`; the hooks were checked with Gitleaks 8.30.1. On macOS, install it with
+`brew install gitleaks`; other platforms can use the
+[official releases](https://github.com/gitleaks/gitleaks/releases).
+
+After cloning or pulling this configuration, install the hooks once from the
+repository root:
+
+```bash
+nvm use
+pnpm --dir frontend install --frozen-lockfile
+pnpm --dir frontend hooks install
+```
+
+The last command writes the local Git hooks; those files are not committed.
+Dependency installation and manual hook runs do not install hooks automatically.
+Run Git from a terminal where Node.js, pnpm, uv and Gitleaks are available.
+
+Before a commit, Ruff checks staged Python files; Prettier, ESLint and
+Stylelint check staged frontend files, and Gitleaks scans the staged diff.
+Checks report errors without fixing files or automatically staging fixes.
+Lefthook temporarily hides unstaged edits in partially staged files so that
+checks see the staged version, then restores those edits.
+
+Before a push, `make check-fast` checks lockfile consistency, formatting, lint,
+types, module boundaries and unused code across both projects. It does not
+run tests or build the frontend, and needs no Docker daemon. Run `make check`
+before committing and `make test-keycloak` before checking the CI result.
+
+To run the hooks manually from the repository root:
+
+```bash
+pnpm --dir frontend hooks run pre-commit
+pnpm --dir frontend hooks run pre-push
+```
+
+The pre-commit file checks normally use staged files. For a formatting check
+on an explicit file without staging it:
+
+```bash
+pnpm --dir frontend hooks run pre-commit --job prettier \
+  --file frontend/src/app/App.tsx --no-stage-fixed
+```
+
+`--no-stage-fixed` also disables hiding unstaged edits for this manual check.
