@@ -408,3 +408,28 @@ older run of this workflow.
 Open a run in Actions, select the failed job and expand its failed step to
 read the command output. A local `make check` does not run the separate
 Keycloak tests; run `make test-keycloak` as well before checking the CI result.
+
+### Security checks
+
+The Security workflow runs every Monday at 04:17 UTC, on pushes to `main`
+that change a dependency lockfile or a workflow, and manually from Actions.
+Its jobs run independently:
+
+- OSV-Scanner checks `backend/uv.lock` and `frontend/pnpm-lock.yaml` for known
+  vulnerabilities. Package names and versions are queried against the OSV
+  database.
+- Gitleaks scans the checked-out branch's Git history with the default rules.
+  Findings fail the job, and detected secret values are fully redacted in the
+  output.
+- Zizmor checks the workflow files and reports findings as GitHub annotations.
+
+The scanner versions are pinned. Downloaded OSV-Scanner and Gitleaks binaries
+are verified against fixed SHA256 checksums before execution. Findings fail
+the corresponding job; review the output before updating dependencies or
+changing scanner rules. A clean scan only covers vulnerabilities and secret
+patterns known to the scanners.
+
+Enable Dependabot alerts in the repository's Settings → Advanced Security →
+Dependabot alerts. Enable the dependency graph if GitHub asks for it. Alerts
+complement the scheduled scan; dependency updates remain manual.
+See [GitHub's instructions](https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/secure-your-dependencies/configure-dependabot-alerts).
