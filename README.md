@@ -4,7 +4,7 @@ Web platform for employee onboarding and offboarding driven by configurable busi
 
 ## Status
 
-Rebuild in progress. The application is being rebuilt from scratch, so setup and usage instructions will be added as the work progresses.
+Rebuild in progress. The backend API, the local infrastructure and the development user script are described below; the frontend is not built yet.
 
 ## Local infrastructure
 
@@ -15,6 +15,7 @@ PostgreSQL and Keycloak run in Docker Compose. All ports are bound to
 
 - Docker with Compose v2 (`docker compose version`)
 - GNU Make
+- [uv](https://docs.astral.sh/uv/) for the backend
 
 ### First start
 
@@ -89,11 +90,11 @@ uv sync --frozen
 ### Run
 
 The API reads its settings from `ACCESSFLOW_*` environment variables:
-`ACCESSFLOW_ENVIRONMENT` (`development`, `test` or `production`), the
-`ACCESSFLOW_DATABASE_*` connection settings and the `ACCESSFLOW_AUTH_*` access
-token settings listed in `.env.example`. The database port defaults to 5432 and
+the `ACCESSFLOW_DATABASE_*` connection settings and the `ACCESSFLOW_AUTH_*` access
+token settings listed in `.env.example` (migrations need only the database ones). The database port defaults to 5432 and
 the token audience `ACCESSFLOW_AUTH_AUDIENCE` to `accessflow-api`; every other
-variable is required, and without it the application refuses to start. The API
+variable is required and must not be empty, and without it the application
+refuses to start. The API
 connects as `accessflow_app`, which can read and change data but not the schema.
 
 The application itself does not read `.env`; `uv run --env-file` loads it into
@@ -114,7 +115,14 @@ curl -i http://127.0.0.1:8000/api/ready
 
 `/api/health` answers `200 OK` with `{"status":"ok"}` while the process runs.
 `/api/ready` answers the same only when the database is reachable, and
-`503` with the code `service.unavailable` otherwise.
+`503` with the code `service.unavailable` otherwise, including when the database
+does not answer within 3 seconds.
+
+The API bounds its waits for the database: a connection attempt and a wait for a
+free pooled connection each give up after 5 seconds, and PostgreSQL cancels a
+statement after 10 seconds, a lock wait after 5 and an idle open transaction
+after 30. TCP keepalives and a 30-second user timeout detect a connection whose
+peer has vanished. Migrations connect without the statement and lock limits.
 
 ### Authentication
 
@@ -129,7 +137,10 @@ verifies the token against the realm's public signing keys
   `accessflow-api`, and `exp`, `iat`, `iss`, `aud` and `sub` are required;
   clocks may differ by up to 30 seconds;
 - the keys are cached for 5 minutes; a token with an unknown key ID reloads
-  them at most once every 30 seconds; loading times out after 5 seconds.
+  them at most once every 30 seconds; each network operation of a download
+  times out after 5 seconds;
+- a failed download is not repeated for 10 seconds, and requests that need the
+  keys while a download is running get 503 at once instead of waiting.
 
 Roles come from `realm_access.roles` and must match exactly (`HR`, not `hr`).
 
@@ -146,7 +157,8 @@ interface can decide what to show:
 {"displayName": "Анна Смирнова", "roles": ["HR", "default-roles-accessflow"]}
 ```
 
-The name is the `name` claim, or `preferred_username` when `name` is empty.
+The name is the `name` claim, or `preferred_username` when `name` is empty; a
+token with neither is rejected with 401.
 
 ### Development users
 
@@ -164,8 +176,11 @@ The script signs in to the Admin API as `admin` with `KEYCLOAK_ADMIN_PASSWORD`
 and asks for the new user's password twice. The password is never printed or
 stored anywhere except Keycloak. Keycloak checks it against the realm policy
 (at least 12 characters) and creates nothing when it fails; an existing
-username or email is rejected with 409. Without `--hr` the user has no roles:
-`/api/me` answers them, and endpoints for HR return 403.
+username or email is rejected with 409. Without `--hr` the script assigns no
+role; the user still has the realm's default roles, which `/api/me` lists, and
+endpoints for HR return 403. If the user is created but the role cannot be
+assigned, the script prints the user's ID and stops: assign the role in the
+admin console or delete the user and run the script again.
 
 To check the password, sign in to the account console at
 `http://localhost:8081/realms/accessflow/account`.
@@ -176,6 +191,9 @@ The schema is changed only by Alembic migrations in `backend/migrations/`.
 They run as `accessflow_owner`, the owner of the `accessflow` database. Tables
 it creates are granted to `accessflow_app` for data access through default
 privileges; tables created by any other role would stay out of the API's reach.
+Every run also removes the API role's access to `alembic_version`, so the
+migration state cannot be changed through the API; an existing database gets
+this with the next `make migrate`.
 
 Apply the migrations to the dev database (the stack must be running):
 
@@ -202,8 +220,8 @@ Run from the repository root:
 make check
 ```
 
-It runs Ruff (lint and format check), mypy in strict mode, import-linter and
-pytest. Warnings raised during tests are treated as errors.
+It checks that `uv.lock` matches `pyproject.toml`, then runs Ruff (lint and
+format check), mypy in strict mode, import-linter and pytest. Warnings raised during tests are treated as errors.
 
 import-linter enforces the module boundaries declared in `backend/pyproject.toml`:
 `app` may import `modules` and `core`, `modules` may import `core`, never the
@@ -259,7 +277,10 @@ only declared top-level field aliases and the safe code `invalid`. Unknown
 locations receive no `field`; nested submitted keys and validator messages are
 never exposed. Submitted values, `input`, `ctx` and exception details are omitted.
 Malformed JSON, invalid UTF-8, unpaired Unicode surrogates and non-finite JSON
-numbers return 422 `request.invalid_body`. JSON bodies are checked before
+numbers (`NaN`, `Infinity` and values such as `1e400` that overflow to infinity)
+return 422 `request.invalid_body`. A request body larger than 1 MiB returns 413
+`request.too_large`; the limit is checked on the declared `Content-Length` and
+again while the body is read. JSON bodies are checked before
 routing when the media type is `application/json`, `application/*+json` or
 absent. Other content types remain subject to endpoint validation.
 

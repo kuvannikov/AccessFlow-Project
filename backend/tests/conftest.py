@@ -33,7 +33,6 @@ def make_settings(
 ) -> Settings:
     # The ".invalid" domain never resolves, so no test reaches a real identity provider.
     return Settings(
-        environment="test",
         database_host=host,
         database_port=port,
         database_name=database,
@@ -93,7 +92,7 @@ def auth_client(auth_settings: Settings) -> Iterator[TestClient]:
 def postgres() -> Iterator[PostgresContainer]:
     """Disposable PostgreSQL initialized by the same scripts as the dev stack."""
     container = (
-        PostgresContainer("postgres:18", password=secrets.token_hex(16), driver="psycopg")
+        PostgresContainer("postgres:18.6", password=secrets.token_hex(16), driver="psycopg")
         .with_env("ACCESSFLOW_OWNER_PASSWORD", secrets.token_hex(16))
         .with_env("ACCESSFLOW_APP_PASSWORD", secrets.token_hex(16))
         .with_env("KEYCLOAK_DB_PASSWORD", secrets.token_hex(16))

@@ -7,9 +7,17 @@ from fastapi import Depends, Request
 from sqlalchemy import URL, Engine, MetaData, create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
-from accessflow.core.config import Settings
+from accessflow.core.config import DatabaseSettings
 
 CONNECT_TIMEOUT_SECONDS = 5
+POOL_TIMEOUT_SECONDS = 5
+STATEMENT_TIMEOUT_SECONDS = 10
+LOCK_TIMEOUT_SECONDS = 5
+IDLE_IN_TRANSACTION_TIMEOUT_SECONDS = 30
+KEEPALIVE_IDLE_SECONDS = 30
+KEEPALIVE_INTERVAL_SECONDS = 10
+KEEPALIVE_PROBES = 3
+TCP_USER_TIMEOUT_MILLISECONDS = 30_000
 
 # Deterministic constraint names: migrations can drop them by name, and a
 # unique violation maps to an API error through the constraint name alone.
@@ -26,7 +34,12 @@ class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
 
-def create_database_engine(settings: Settings) -> Engine:
+def create_database_engine(settings: DatabaseSettings, *, limit_statements: bool = True) -> Engine:
+    """Engine with bounded waits on connect, on a pool slot and on a silent peer.
+
+    The server also cancels statements and lock waits that run too long, unless
+    `limit_statements` is off, which a migration needs for a slow schema change.
+    """
     url = URL.create(
         "postgresql+psycopg",
         username=settings.database_user,
@@ -35,10 +48,22 @@ def create_database_engine(settings: Settings) -> Engine:
         port=settings.database_port,
         database=settings.database_name,
     )
+    connect_args: dict[str, str | int] = {
+        "connect_timeout": CONNECT_TIMEOUT_SECONDS,
+        "keepalives": 1,
+        "keepalives_idle": KEEPALIVE_IDLE_SECONDS,
+        "keepalives_interval": KEEPALIVE_INTERVAL_SECONDS,
+        "keepalives_count": KEEPALIVE_PROBES,
+        "tcp_user_timeout": TCP_USER_TIMEOUT_MILLISECONDS,
+    }
+    if limit_statements:
+        connect_args["options"] = (
+            f"-c statement_timeout={STATEMENT_TIMEOUT_SECONDS * 1000} "
+            f"-c lock_timeout={LOCK_TIMEOUT_SECONDS * 1000} "
+            f"-c idle_in_transaction_session_timeout={IDLE_IN_TRANSACTION_TIMEOUT_SECONDS * 1000}"
+        )
     return create_engine(
-        url,
-        pool_pre_ping=True,
-        connect_args={"connect_timeout": CONNECT_TIMEOUT_SECONDS},
+        url, pool_pre_ping=True, pool_timeout=POOL_TIMEOUT_SECONDS, connect_args=connect_args
     )
 
 

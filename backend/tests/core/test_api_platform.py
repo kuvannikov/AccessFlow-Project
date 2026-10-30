@@ -21,6 +21,7 @@ from accessflow.core.logging import (
     http_logger,
     request_id_context,
 )
+from accessflow.core.middleware import MAX_BODY_BYTES
 
 
 class SubmittedData(BaseModel):
@@ -29,8 +30,8 @@ class SubmittedData(BaseModel):
 
     @field_validator("display_name")
     @classmethod
-    def reject_private_value(cls, value: str) -> str:
-        if value.startswith("private"):
+    def reject_canary_value(cls, value: str) -> str:
+        if value.startswith("canary"):
             raise ValueError(value)
         return value
 
@@ -56,15 +57,15 @@ def platform_app(settings: Settings) -> FastAPI:
 
     @app.get("/test/http/{status}")
     def http_error(status: int) -> None:
-        raise HTTPException(status, detail="private-http-detail", headers={"Retry-After": "3"})
+        raise HTTPException(status, detail="canary-http-detail", headers={"Retry-After": "3"})
 
     @app.get("/test/domain")
     def domain_error() -> None:
-        raise ConflictError("private-domain-message")
+        raise ConflictError("canary-domain-message")
 
     @app.get("/test/unknown")
     def unknown_error() -> None:
-        raise UnknownError("private-unknown-message")
+        raise UnknownError("canary-unknown-message")
 
     @app.get("/test/crash/{value}")
     def crash(value: str) -> None:
@@ -79,7 +80,7 @@ def platform_app(settings: Settings) -> FastAPI:
     def stream() -> StreamingResponse:
         def chunks() -> Iterator[bytes]:
             yield b"ok"
-            raise RuntimeError("private-stream-error")
+            raise RuntimeError("canary-stream-error")
 
         return StreamingResponse(chunks())
 
@@ -114,34 +115,34 @@ def test_http_errors_are_safe(platform_client: TestClient, status: int) -> None:
     assert body["status"] == status
     assert body["type"] == f"/problems/{body['code']}"
     assert body["requestId"] == response.headers["x-request-id"]
-    assert "private" not in response.text
+    assert "canary" not in response.text
 
 
-@pytest.mark.parametrize("path", ["/test/unknown", "/test/crash/private-error", "/test/http/500"])
+@pytest.mark.parametrize("path", ["/test/unknown", "/test/crash/canary-error", "/test/http/500"])
 def test_internal_errors_have_minimal_body(
     platform_client: TestClient, http_output: io.StringIO, path: str
 ) -> None:
-    response = platform_client.get(path, params={"search": "private-search"})
+    response = platform_client.get(path, params={"search": "canary-search"})
     assert response.status_code == 500
     assert response.json() == {"code": "internal", "requestId": response.headers["x-request-id"]}
-    assert "private" not in response.text + http_output.getvalue()
+    assert "canary" not in response.text + http_output.getvalue()
 
 
 def test_unhandled_error_log_names_type_and_origin(
     platform_client: TestClient, http_output: io.StringIO
 ) -> None:
-    platform_client.get("/test/crash/private-error")
+    platform_client.get("/test/crash/canary-error")
     log = http_output.getvalue()
     assert 'error="RuntimeError"' in log
     assert f"origin={json.dumps(__file__)[:-1]}:" in log
-    assert "private-error" not in log
+    assert "canary-error" not in log
 
 
 def test_domain_registry(platform_client: TestClient) -> None:
     response = platform_client.get("/test/domain")
     assert response.status_code == 409
     assert response.json()["code"] == "example.conflict"
-    assert "private" not in response.text
+    assert "canary" not in response.text
 
 
 def test_registry_rejects_duplicate_registration(platform_app: FastAPI) -> None:
@@ -174,8 +175,8 @@ def test_invalid_json_and_unicode(
 @pytest.mark.parametrize(
     "data",
     [
-        {"displayName": "private-validator-message"},
-        {"displayName": 123, "private-extra-field": "private-value"},
+        {"displayName": "canary-validator-message"},
+        {"displayName": 123, "canary-extra-field": "canary-value"},
         {},
     ],
 )
@@ -183,15 +184,15 @@ def test_validation_does_not_echo_input(
     platform_client: TestClient, http_output: io.StringIO, data: dict[str, object]
 ) -> None:
     response = platform_client.post(
-        "/test/body?search=private-query",
+        "/test/body?search=canary-query",
         json=data,
-        headers={"authorization": "Bearer private-header"},
+        headers={"authorization": "Bearer canary-header"},
     )
     assert response.status_code == 422
     body = response.json()
     assert body["code"] == "validation.failed"
     assert {"field": "displayName", "code": "invalid"} in body["errors"]
-    assert "private" not in response.text + http_output.getvalue()
+    assert "canary" not in response.text + http_output.getvalue()
     assert "input" not in response.text
     assert "ctx" not in response.text
 
@@ -211,15 +212,29 @@ def test_request_id_is_generated(platform_client: TestClient, value: str | None)
     assert str(UUID(response.headers["x-request-id"])) == response.headers["x-request-id"]
 
 
+@pytest.mark.parametrize("form", ["hex", "braces", "urn"])
+def test_non_canonical_request_id_is_replaced(platform_client: TestClient, form: str) -> None:
+    original = uuid4()
+    value = {"hex": original.hex, "braces": f"{{{original}}}", "urn": original.urn}[form]
+    response = platform_client.get("/api/health", headers={"x-request-id": value})
+    assert response.headers["x-request-id"] != str(original)
+
+
+def test_uppercase_request_id_is_normalized(platform_client: TestClient) -> None:
+    original = uuid4()
+    response = platform_client.get("/api/health", headers={"x-request-id": str(original).upper()})
+    assert response.headers["x-request-id"] == str(original)
+
+
 def test_valid_request_id_is_used_everywhere(
     platform_client: TestClient, http_output: io.StringIO
 ) -> None:
     request_id = str(uuid4())
-    response = platform_client.get("/test/crash/private", headers={"x-request-id": request_id})
+    response = platform_client.get("/test/crash/canary", headers={"x-request-id": request_id})
     assert response.headers["x-request-id"] == response.json()["requestId"] == request_id
     assert f'request_id="{request_id}"' in http_output.getvalue()
     assert 'route="/test/crash/{value}"' in http_output.getvalue()
-    assert "private" not in http_output.getvalue()
+    assert "canary" not in http_output.getvalue()
     assert request_id_context.get() == "-"
 
 
@@ -234,12 +249,12 @@ def test_duplicate_request_ids_are_replaced(platform_client: TestClient) -> None
 def test_unmatched_paths_and_methods_are_safe(
     platform_client: TestClient, http_output: io.StringIO
 ) -> None:
-    assert platform_client.get("/private-path?q=private-query").status_code == 404
+    assert platform_client.get("/canary-path?q=canary-query").status_code == 404
     assert platform_client.post("/api/health").status_code == 405
     lines = http_output.getvalue().splitlines()
     assert len(lines) == 2
     assert 'route="unmatched"' in lines[0]
-    assert "private" not in http_output.getvalue()
+    assert "canary" not in http_output.getvalue()
     assert logging.getLogger("uvicorn.access").disabled
 
 
@@ -277,7 +292,7 @@ def test_context_isolated_between_concurrent_requests(platform_app: FastAPI) -> 
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("constant", ["NaN", "Infinity", "-Infinity"])
+@pytest.mark.parametrize("constant", ["NaN", "Infinity", "-Infinity", "1e400", "-1e400", "1E999"])
 def test_non_finite_numbers_are_not_json(platform_client: TestClient, constant: str) -> None:
     response = platform_client.post(
         "/test/body",
@@ -288,12 +303,50 @@ def test_non_finite_numbers_are_not_json(platform_client: TestClient, constant: 
     assert response.json()["code"] == "request.invalid_body"
 
 
+def json_body_of_size(size: int) -> bytes:
+    overhead = len(b'{"displayName":""}')
+    return b'{"displayName":"' + b"a" * (size - overhead) + b'"}'
+
+
+def test_body_at_the_limit_is_accepted(platform_client: TestClient) -> None:
+    response = platform_client.post(
+        "/test/body",
+        content=json_body_of_size(MAX_BODY_BYTES),
+        headers={"content-type": "application/json"},
+    )
+    assert response.status_code == 200
+
+
+@pytest.mark.parametrize("content_type", ["application/json", "text/plain", None])
+def test_declared_oversized_body_is_rejected(
+    platform_client: TestClient, content_type: str | None
+) -> None:
+    headers = {"content-type": content_type} if content_type else {}
+    response = platform_client.post(
+        "/test/body", content=json_body_of_size(MAX_BODY_BYTES + 1), headers=headers
+    )
+    assert response.status_code == 413
+    assert response.headers["content-type"] == "application/problem+json"
+    assert response.json()["code"] == "request.too_large"
+
+
+def test_oversized_streamed_body_is_rejected(platform_client: TestClient) -> None:
+    def chunks() -> Iterator[bytes]:
+        yield from (b"a" * 1024 for _ in range(MAX_BODY_BYTES // 1024 + 1))
+
+    response = platform_client.post(
+        "/test/body", content=chunks(), headers={"content-type": "application/json"}
+    )
+    assert response.status_code == 413
+    assert response.json()["code"] == "request.too_large"
+
+
 def test_late_stream_failure_is_correlated(
     platform_client: TestClient, http_output: io.StringIO
 ) -> None:
     request_id = str(uuid4())
     with (
-        pytest.raises(RuntimeError, match="private-stream-error") as caught,
+        pytest.raises(RuntimeError, match="canary-stream-error") as caught,
         TestClient(platform_client.app) as raising_client,
     ):
         raising_client.get("/test/stream", headers={"x-request-id": request_id})
@@ -301,12 +354,12 @@ def test_late_stream_failure_is_correlated(
     assert f'request_id="{request_id}"' in http_output.getvalue()
     assert 'level="ERROR"' in http_output.getvalue()
     assert "status=200" in http_output.getvalue()
-    assert "private" not in http_output.getvalue()
+    assert "canary" not in http_output.getvalue()
     assert request_id_context.get() == "-"
 
 
 def test_server_exception_log_is_safe() -> None:
-    error = RuntimeError("private-error")
+    error = RuntimeError("canary-error")
     request_id = str(uuid4())
     error.__dict__["_accessflow_request_id"] = request_id
     record = logging.LogRecord(
@@ -314,15 +367,15 @@ def test_server_exception_log_is_safe() -> None:
         logging.ERROR,
         __file__,
         1,
-        "private-message",
+        "canary-message",
         (),
         (RuntimeError, error, None),
     )
-    record.exc_text = "private-cached-traceback"
+    record.exc_text = "canary-cached-traceback"
     assert ServerErrorFilter().filter(record)
     result = logging.Formatter().format(record)
     assert request_id in result
-    assert "private" not in result
+    assert "canary" not in result
     assert "\n" not in result
 
 

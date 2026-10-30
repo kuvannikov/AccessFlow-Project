@@ -1,4 +1,7 @@
+import contextlib
 import secrets
+import threading
+import time
 from datetime import UTC, datetime
 from http import HTTPStatus
 from typing import Any
@@ -6,6 +9,7 @@ from typing import Any
 import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import ec
+from jwt import PyJWKClient
 from time_machine import TimeMachineFixture
 
 from accessflow.core.config import Settings
@@ -15,6 +19,7 @@ from accessflow.core.security import (
     InvalidAccessTokenError,
     KeySetClient,
     Principal,
+    create_key_set_client,
     create_token_verifier,
     principal_from_claims,
 )
@@ -214,6 +219,24 @@ def test_unreachable_key_set_is_unavailable(
         verifier.verify(signing_key.sign(claims))
 
 
+def test_connection_reset_while_reading_key_set_is_unavailable(
+    jwks_server: JwksServer,
+    signing_key: SigningKey,
+    claims: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def reset(self: PyJWKClient) -> object:
+        raise ConnectionResetError
+
+    monkeypatch.setattr(PyJWKClient, "fetch_data", reset)
+    verifier = AccessTokenVerifier(
+        KeySetClient(jwks_server.url), issuer=ISSUER, audience="accessflow-api"
+    )
+
+    with pytest.raises(IdentityProviderUnavailableError):
+        verifier.verify(signing_key.sign(claims))
+
+
 def test_key_set_timeout_is_unavailable(
     jwks_server: JwksServer, signing_key: SigningKey, claims: dict[str, Any]
 ) -> None:
@@ -223,6 +246,69 @@ def test_key_set_timeout_is_unavailable(
 
     with pytest.raises(IdentityProviderUnavailableError):
         verifier.verify(signing_key.sign(claims))
+
+
+def test_key_set_client_is_configured_from_constants(auth_settings: Settings) -> None:
+    keys = create_key_set_client(auth_settings)
+
+    assert keys.timeout == 5
+    assert keys.cooldown_duration == 30
+    assert keys.jwk_set_cache is not None
+    assert keys.jwk_set_cache.lifespan == 300
+
+
+def test_failed_download_is_not_repeated_during_cooldown(
+    jwks_server: JwksServer, signing_key: SigningKey, claims: dict[str, Any]
+) -> None:
+    jwks_server.response = (HTTPStatus.SERVICE_UNAVAILABLE, b"")
+    keys = KeySetClient(jwks_server.url, failure_cooldown=60)
+    verifier = AccessTokenVerifier(keys, issuer=ISSUER, audience="accessflow-api")
+
+    for _ in range(3):
+        with pytest.raises(IdentityProviderUnavailableError):
+            verifier.verify(signing_key.sign(claims))
+
+    assert jwks_server.requests == 1
+
+
+def test_download_is_retried_after_cooldown(
+    jwks_server: JwksServer, signing_key: SigningKey, claims: dict[str, Any]
+) -> None:
+    jwks_server.response = (HTTPStatus.SERVICE_UNAVAILABLE, b"")
+    keys = KeySetClient(jwks_server.url, failure_cooldown=0)
+    verifier = AccessTokenVerifier(keys, issuer=ISSUER, audience="accessflow-api")
+    with pytest.raises(IdentityProviderUnavailableError):
+        verifier.verify(signing_key.sign(claims))
+    jwks_server.response = None
+
+    assert verifier.verify(signing_key.sign(claims)) == claims
+    assert jwks_server.requests == 2
+
+
+def test_request_does_not_wait_for_a_download_in_progress(
+    jwks_server: JwksServer, signing_key: SigningKey, claims: dict[str, Any]
+) -> None:
+    jwks_server.stalled = True
+    keys = KeySetClient(jwks_server.url, timeout=1)
+    verifier = AccessTokenVerifier(keys, issuer=ISSUER, audience="accessflow-api")
+    first = threading.Thread(target=lambda: _verify_quietly(verifier, signing_key.sign(claims)))
+    first.start()
+    while jwks_server.requests == 0:
+        time.sleep(0.01)
+
+    started = time.perf_counter()
+    with pytest.raises(IdentityProviderUnavailableError):
+        verifier.verify(signing_key.sign(claims))
+    waited = time.perf_counter() - started
+    first.join()
+
+    assert waited < 0.5
+    assert jwks_server.requests == 1
+
+
+def _verify_quietly(verifier: AccessTokenVerifier, token: str) -> None:
+    with contextlib.suppress(IdentityProviderUnavailableError):
+        verifier.verify(token)
 
 
 @pytest.mark.parametrize(

@@ -32,6 +32,15 @@ class NewUser:
     roles: tuple[str, ...] = ()
 
 
+class RoleAssignmentError(Exception):
+    """The user was created, but its roles could not be assigned."""
+
+    def __init__(self, user_id: str, cause: httpx2.HTTPError) -> None:
+        super().__init__(user_id)
+        self.user_id = user_id
+        self.cause = cause
+
+
 @contextmanager
 def admin_client(keycloak_url: str, admin_password: str) -> Iterator[httpx2.Client]:
     """Client of the realm's Admin API, signed in as the bootstrap administrator."""
@@ -55,7 +64,8 @@ def create_user(admin: httpx2.Client, user: NewUser) -> str:
     """Create the user with a permanent password and its realm roles; return the user ID.
 
     Keycloak checks the password against the realm policy and creates nothing
-    when it fails.
+    when it fails. Raises RoleAssignmentError when the user exists but the
+    assignment failed.
     """
     # Looked up first, so a missing role leaves no user behind.
     roles = [admin.get(f"/roles/{role}").raise_for_status().json() for role in user.roles]
@@ -74,7 +84,10 @@ def create_user(admin: httpx2.Client, user: NewUser) -> str:
     ).raise_for_status()
     user_id = response.headers["Location"].rsplit("/", 1)[-1]
     if roles:
-        admin.post(f"/users/{user_id}/role-mappings/realm", json=roles).raise_for_status()
+        try:
+            admin.post(f"/users/{user_id}/role-mappings/realm", json=roles).raise_for_status()
+        except httpx2.HTTPError as error:
+            raise RoleAssignmentError(user_id, error) from error
     return user_id
 
 
@@ -89,6 +102,16 @@ def keycloak_error(response: httpx2.Response) -> str:
             if isinstance(detail := body.get(key), str):
                 return detail
     return response.reason_phrase
+
+
+def describe_failure(error: httpx2.HTTPError) -> str:
+    if isinstance(error, httpx2.HTTPStatusError):
+        request, response = error.request, error.response
+        return (
+            f"Keycloak refused {request.method} {request.url.path}: "
+            f"{response.status_code} {keycloak_error(response)}"
+        )
+    return f"Keycloak is not reachable: {error}"
 
 
 def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
@@ -130,18 +153,24 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         with admin_client(args.keycloak_url, admin_password) as admin:
             user_id = create_user(admin, user)
-    except httpx2.HTTPStatusError as error:
-        request, response = error.request, error.response
+    except RoleAssignmentError as error:
         print(
-            f"Keycloak refused {request.method} {request.url.path}: "
-            f"{response.status_code} {keycloak_error(response)}",
+            f"User {user.username} (id {error.user_id}) was created without the requested "
+            f"roles: {describe_failure(error.cause)}. Assign the roles in the admin console "
+            "or delete the user and run the script again.",
             file=sys.stderr,
         )
+        return 1
+    except httpx2.HTTPStatusError as error:
+        print(describe_failure(error), file=sys.stderr)
         return 1
     except httpx2.TransportError as error:
         print(f"Keycloak is not reachable at {args.keycloak_url}: {error}", file=sys.stderr)
         return 1
-    print(f"Created user {user.username} (id {user_id}), roles: {', '.join(user.roles) or 'none'}.")
+    print(
+        f"Created user {user.username} (id {user_id}), "
+        f"assigned roles: {', '.join(user.roles) or 'none'}."
+    )
     return 0
 
 

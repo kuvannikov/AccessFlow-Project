@@ -1,20 +1,31 @@
+import logging
 import re
+from unittest.mock import Mock
 
-import pytest
 from fastapi.testclient import TestClient
-from pydantic import ValidationError
 
 from accessflow.app import create_app
 from accessflow.core.config import Settings
+from accessflow.core.logging import ServerErrorFilter
 
 PUBLIC_PATHS = {"/api/health", "/api/ready"}
 
 
-def test_create_app_fails_without_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("ACCESSFLOW_ENVIRONMENT", raising=False)
+def test_server_logs_are_filtered(settings: Settings) -> None:
+    create_app(settings)
 
-    with pytest.raises(ValidationError):
-        create_app()
+    filters = logging.getLogger("uvicorn.error").filters
+    assert any(isinstance(item, ServerErrorFilter) for item in filters)
+
+
+def test_engine_is_disposed_on_shutdown(settings: Settings) -> None:
+    app = create_app(settings)
+    app.state.engine.dispose = dispose = Mock()
+
+    with TestClient(app):
+        dispose.assert_not_called()
+
+    dispose.assert_called_once_with()
 
 
 def test_api_requires_token_except_health_checks(settings: Settings) -> None:

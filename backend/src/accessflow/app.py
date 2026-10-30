@@ -1,6 +1,7 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+from anyio import CapacityLimiter
 from fastapi import FastAPI
 from sqlalchemy.orm import sessionmaker
 
@@ -23,6 +24,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.engine.dispose()
 
 
+# Probes that hang on an unresponsive database may keep this many threads busy.
+READINESS_THREADS = 2
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     """Build the application. Without explicit settings they are read from the environment."""
     settings = settings if settings is not None else Settings()
@@ -31,6 +36,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.engine = engine
     app.state.session_factory = sessionmaker(engine)
+    app.state.readiness_limiter = CapacityLimiter(READINESS_THREADS)
     app.state.token_verifier = create_token_verifier(settings)
     configure_logging()
     install_error_handlers(app)

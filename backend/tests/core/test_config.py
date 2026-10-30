@@ -1,10 +1,9 @@
 import pytest
 from pydantic import ValidationError
 
-from accessflow.core.config import Settings
+from accessflow.core.config import DatabaseSettings, Settings
 
 REQUIRED_VARIABLES = {
-    "ACCESSFLOW_ENVIRONMENT": "test",
     "ACCESSFLOW_DATABASE_HOST": "db.example.test",
     "ACCESSFLOW_DATABASE_NAME": "accessflow",
     "ACCESSFLOW_DATABASE_USER": "accessflow_app",
@@ -25,7 +24,6 @@ def environment(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_reads_settings_from_environment() -> None:
     settings = Settings()
 
-    assert settings.environment == "test"
     assert settings.database_host == "db.example.test"
     assert settings.database_port == 5432
     assert settings.database_password.get_secret_value() == "private-password"
@@ -49,9 +47,27 @@ def test_missing_variable_fails(monkeypatch: pytest.MonkeyPatch, name: str) -> N
 
 
 @pytest.mark.parametrize(
+    "name",
+    [name for name in REQUIRED_VARIABLES if name != "ACCESSFLOW_AUTH_JWKS_URL"],
+)
+def test_empty_variable_fails(monkeypatch: pytest.MonkeyPatch, name: str) -> None:
+    monkeypatch.setenv(name, "")
+
+    with pytest.raises(ValidationError):
+        Settings()
+
+
+def test_database_settings_do_not_need_auth_variables(monkeypatch: pytest.MonkeyPatch) -> None:
+    for name in REQUIRED_VARIABLES:
+        if name.startswith("ACCESSFLOW_AUTH_"):
+            monkeypatch.delenv(name)
+
+    assert DatabaseSettings().database_host == "db.example.test"
+
+
+@pytest.mark.parametrize(
     ("name", "value"),
     [
-        ("ACCESSFLOW_ENVIRONMENT", "staging"),
         ("ACCESSFLOW_DATABASE_PORT", "70000"),
         ("ACCESSFLOW_AUTH_ISSUER", ""),
         ("ACCESSFLOW_AUTH_JWKS_URL", "file:///etc/passwd"),

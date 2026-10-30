@@ -48,6 +48,7 @@ class ErrorRegistry:
         self._definitions[error] = definition
 
     def resolve(self, error: DomainError) -> ProblemDefinition | None:
+        # Exact type on purpose: a subclass must be reviewed and registered on its own.
         return self._definitions.get(type(error))
 
 

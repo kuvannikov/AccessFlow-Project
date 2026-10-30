@@ -1,34 +1,28 @@
 .PHONY: up down logs ps migrate check backend-check test-keycloak
 
-# Run every check of the project (the frontend joins later).
 check: backend-check
 
-# Lint, format check, types, module boundaries and tests of the backend.
 backend-check:
+	cd backend && uv lock --check
 	cd backend && uv run --frozen ruff check .
 	cd backend && uv run --frozen ruff format --check .
 	cd backend && uv run --frozen mypy
 	cd backend && uv run --frozen lint-imports
 	cd backend && uv run --frozen pytest
 
-# Backend tests against a disposable Keycloak that imports the project realm.
 test-keycloak:
 	cd backend && uv run --frozen pytest -m keycloak
 
-# Start the dev stack and wait until both services are healthy.
 up:
 	docker compose up -d --wait --wait-timeout 180
 
-# Stop and remove containers and the network. Volumes (the data) are kept.
 # Never add -v here: it deletes the database.
 down:
 	docker compose down
 
-# Follow the logs of all services (stop with Ctrl+C).
 logs:
 	docker compose logs -f --tail=100
 
-# Show the state of the services.
 ps:
 	docker compose ps
 

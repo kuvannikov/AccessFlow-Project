@@ -46,7 +46,10 @@ def test_hr_user_signs_in_with_the_typed_password(
     user_id = keycloak.find_user("o.kuznetsova")
     assert exit_code == 0
     assert user_id is not None
-    assert capsys.readouterr() == (f"Created user o.kuznetsova (id {user_id}), roles: HR.\n", "")
+    assert capsys.readouterr() == (
+        f"Created user o.kuznetsova (id {user_id}), assigned roles: HR.\n",
+        "",
+    )
     token = keycloak.access_token(RealmUser(id=user_id, username="o.kuznetsova", password=password))
     me = client.get("/api/me", headers=bearer(token))
     assert me.status_code == 200
@@ -71,7 +74,10 @@ def test_user_without_hr_is_signed_in_but_forbidden(
     user_id = keycloak.find_user("d.sokolov")
     assert exit_code == 0
     assert user_id is not None
-    assert capsys.readouterr() == (f"Created user d.sokolov (id {user_id}), roles: none.\n", "")
+    assert capsys.readouterr() == (
+        f"Created user d.sokolov (id {user_id}), assigned roles: none.\n",
+        "",
+    )
     token = keycloak.access_token(RealmUser(id=user_id, username="d.sokolov", password=password))
     assert client.get("/api/me", headers=bearer(token)).status_code == 200
     assert client.get("/test/hr", headers=bearer(token)).status_code == 403

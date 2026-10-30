@@ -1,5 +1,6 @@
 """Access tokens of the identity provider and the principal they authenticate."""
 
+import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Annotated, Any
@@ -18,6 +19,7 @@ CLOCK_SKEW_SECONDS = 30
 KEY_SET_LIFESPAN_SECONDS = 300
 KEY_SET_TIMEOUT_SECONDS = 5
 KEY_SET_REFRESH_COOLDOWN_SECONDS = 30
+KEY_SET_FAILURE_COOLDOWN_SECONDS = 10
 DISPLAY_NAME_CLAIMS = ("name", "preferred_username")
 
 
@@ -39,7 +41,50 @@ class KeySetClient(PyJWKClient):
 
     PyJWKClient raises PyJWKClientError in both cases, but only the first one
     is a server-side failure.
+
+    PyJWKClient holds a lock during the download and remembers only successes,
+    so while the identity provider hangs every request would wait for its own
+    attempt in a worker thread, and the threads that also serve the health
+    endpoints would run out. Here a download that has failed is not repeated for
+    `failure_cooldown` seconds, and requests that need the key set while one is
+    being downloaded fail at once instead of waiting.
     """
+
+    def __init__(
+        self,
+        uri: str,
+        *,
+        failure_cooldown: float = KEY_SET_FAILURE_COOLDOWN_SECONDS,
+        **options: Any,
+    ) -> None:
+        super().__init__(uri, **options)
+        self._failure_cooldown = failure_cooldown
+        self._failed_at: float | None = None
+        self._downloading = False
+
+    def get_signing_key(self, kid: str) -> PyJWK:
+        if self._downloading and self._key_set_unavailable():
+            raise IdentityProviderUnavailableError
+        return super().get_signing_key(kid)
+
+    def _key_set_unavailable(self) -> bool:
+        return self.jwk_set_cache is None or self.jwk_set_cache.get() is None
+
+    def fetch_data(self) -> Any:
+        if self._failed_at is not None and (
+            time.monotonic() - self._failed_at < self._failure_cooldown
+        ):
+            raise IdentityProviderUnavailableError
+        self._downloading = True
+        try:
+            data = super().fetch_data()
+        except BaseException:
+            self._failed_at = time.monotonic()
+            raise
+        finally:
+            self._downloading = False
+        self._failed_at = None
+        return data
 
     def get_signing_keys(self, refresh: bool = False) -> list[PyJWK]:
         try:
@@ -85,14 +130,21 @@ class AccessTokenVerifier:
             raise InvalidAccessTokenError from error
 
 
-def create_token_verifier(settings: Settings) -> AccessTokenVerifier:
-    keys = KeySetClient(
+def create_key_set_client(settings: Settings) -> KeySetClient:
+    return KeySetClient(
         str(settings.auth_jwks_url),
         lifespan=KEY_SET_LIFESPAN_SECONDS,
         timeout=KEY_SET_TIMEOUT_SECONDS,
         cooldown_duration=KEY_SET_REFRESH_COOLDOWN_SECONDS,
     )
-    return AccessTokenVerifier(keys, issuer=settings.auth_issuer, audience=settings.auth_audience)
+
+
+def create_token_verifier(settings: Settings) -> AccessTokenVerifier:
+    return AccessTokenVerifier(
+        create_key_set_client(settings),
+        issuer=settings.auth_issuer,
+        audience=settings.auth_audience,
+    )
 
 
 @dataclass(frozen=True)
