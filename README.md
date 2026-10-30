@@ -340,7 +340,11 @@ nvm install
 npm install -g pnpm@12
 cd frontend
 pnpm install --frozen-lockfile
+pnpm exec playwright install chromium
 ```
+
+The last command downloads the Chromium build that matches the installed
+Playwright version; repeat it after Playwright is updated.
 
 pnpm switches to the version from `packageManager` by itself. The install fails
 under a Node.js version outside `engines` in `package.json`; run `nvm use` in
@@ -361,8 +365,8 @@ change.
 exactly the versions from `pnpm-lock.yaml` and fails if the lockfile does not
 match `package.json`, checks formatting with Prettier, lints the code with
 ESLint and the styles with Stylelint, type-checks the code with the TypeScript
-compiler in strict mode and builds the production bundle into `frontend/dist`.
-ESLint fails on warnings as well as errors.
+compiler in strict mode, runs the tests and builds the production bundle into
+`frontend/dist`. ESLint fails on warnings as well as errors.
 
 To fix formatting, run `pnpm format` in `frontend/`.
 
@@ -372,3 +376,12 @@ Router rules. It also enforces the layers of `frontend/src`: `app` may import
 `pages`, `features` and `shared`, `pages` may import `features` and `shared`,
 a feature may import `shared` but not another feature, and `shared` imports
 nothing above it. Every file under `src` must belong to one of these layers.
+
+Tests run on [Vitest](https://vitest.dev/) in two projects, chosen by the file
+extension. `*.test.ts` files form the `unit` project and run in Node.js; they
+cover code without a user interface. `*.test.tsx` files form the `browser`
+project and run in headless Chromium through Playwright, because focus and
+keyboard behave there as in a real browser. Tests live next to the code they
+cover. To run one project, use `pnpm test --project unit` or
+`pnpm test --project browser` in `frontend/`. Screenshots of failed browser
+tests are saved to `frontend/.vitest/attachments`.
