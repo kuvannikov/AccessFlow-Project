@@ -1,0 +1,2 @@
+# pnpm 12 otherwise installs under a Node.js version outside package.json engines.
+engineStrict: true

@@ -4,7 +4,7 @@ Web platform for employee onboarding and offboarding driven by configurable busi
 
 ## Status
 
-Rebuild in progress. The backend API, the local infrastructure and the development user script are described below; the frontend is not built yet.
+Rebuild in progress. The backend API, the local infrastructure and the development user script are described below; the frontend is a minimal application without screens yet.
 
 ## Local infrastructure
 
@@ -16,6 +16,7 @@ PostgreSQL and Keycloak run in Docker Compose. All ports are bound to
 - Docker with Compose v2 (`docker compose version`)
 - GNU Make
 - [uv](https://docs.astral.sh/uv/) for the backend
+- Node.js 26 and pnpm 12 for the frontend (see [Frontend](#frontend))
 
 ### First start
 
@@ -60,7 +61,8 @@ PostgreSQL roles:
 | `make ps`            | Show the state of the services                          |
 | `make logs`          | Follow the logs (stop with Ctrl+C)                      |
 | `make migrate`       | Apply the database migrations as `accessflow_owner`     |
-| `make check`         | Lint, format, types, module boundaries, backend tests   |
+| `make web`           | Start the frontend dev server                           |
+| `make check`         | All backend and frontend checks                         |
 | `make test-keycloak` | Backend tests against a disposable Keycloak             |
 
 ### Data
@@ -320,3 +322,42 @@ even though health normally supports GET. The response header and JSON body
 must contain the supplied request ID. The terminal log shows the same ID and
 `route="unmatched"`, with no submitted body. For a normal health request, expect
 200 and `route="/api/health"`.
+
+## Frontend
+
+The web client is a React and TypeScript application in `frontend/`, built with
+[Vite](https://vite.dev/) and managed by [pnpm](https://pnpm.io/). The Node.js
+version is pinned in `.nvmrc`, the pnpm version in the `packageManager` field of
+`frontend/package.json`, and the dependency versions in `frontend/pnpm-lock.yaml`.
+
+### Setup
+
+Node.js 26 no longer ships Corepack, so pnpm is installed once with npm. With
+[nvm](https://github.com/nvm-sh/nvm), from the repository root:
+
+```bash
+nvm install
+npm install -g pnpm@12
+cd frontend
+pnpm install --frozen-lockfile
+```
+
+pnpm switches to the version from `packageManager` by itself. The install fails
+under a Node.js version outside `engines` in `package.json`; run `nvm use` in
+every new terminal before working on the frontend or running `make check`.
+
+### Run
+
+```bash
+make web
+```
+
+Vite serves the application at `http://localhost:5173` and reloads it on every
+change.
+
+### Checks
+
+`make check` runs the frontend checks after the backend ones: it installs
+exactly the versions from `pnpm-lock.yaml` and fails if the lockfile does not
+match `package.json`, type-checks the code with the TypeScript compiler in
+strict mode and builds the production bundle into `frontend/dist`.
