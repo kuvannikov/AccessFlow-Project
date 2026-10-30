@@ -359,5 +359,16 @@ change.
 
 `make check` runs the frontend checks after the backend ones: it installs
 exactly the versions from `pnpm-lock.yaml` and fails if the lockfile does not
-match `package.json`, type-checks the code with the TypeScript compiler in
-strict mode and builds the production bundle into `frontend/dist`.
+match `package.json`, checks formatting with Prettier, lints the code with
+ESLint and the styles with Stylelint, type-checks the code with the TypeScript
+compiler in strict mode and builds the production bundle into `frontend/dist`.
+ESLint fails on warnings as well as errors.
+
+To fix formatting, run `pnpm format` in `frontend/`.
+
+ESLint uses the type-aware strict rules of typescript-eslint, the React Hooks
+and React Compiler rules, accessibility rules for JSX and the TanStack Query and
+Router rules. It also enforces the layers of `frontend/src`: `app` may import
+`pages`, `features` and `shared`, `pages` may import `features` and `shared`,
+a feature may import `shared` but not another feature, and `shared` imports
+nothing above it. Every file under `src` must belong to one of these layers.

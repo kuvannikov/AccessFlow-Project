@@ -1,2 +1,7 @@
 # pnpm 12 otherwise installs under a Node.js version outside package.json engines.
 engineStrict: true
+
+allowBuilds:
+  # Its postinstall only fetches the native binding when the platform package
+  # is missing; pnpm installs that package as an optional dependency.
+  unrs-resolver: false

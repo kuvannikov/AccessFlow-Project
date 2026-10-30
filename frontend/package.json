@@ -10,7 +10,11 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --build"
+    "typecheck": "tsc --build",
+    "lint": "eslint --max-warnings 0 .",
+    "lint:css": "stylelint \"src/**/*.css\" --allow-empty-input",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "react": "^19.3.1",
@@ -18,13 +22,26 @@
   },
   "devDependencies": {
     "@babel/core": "^8.0.9",
+    "@eslint/js": "^10.0.1",
     "@rolldown/plugin-babel": "^0.2.4",
+    "@tanstack/eslint-plugin-query": "^5.105.0",
+    "@tanstack/eslint-plugin-router": "^1.162.0",
     "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
     "babel-plugin-react-compiler": "^1.0.0",
+    "eslint": "^10.13.0",
+    "eslint-import-resolver-typescript": "^4.4.5",
+    "eslint-plugin-boundaries": "^7.4.0",
+    "eslint-plugin-jsx-a11y-x": "^0.2.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "prettier": "^3.9.10",
+    "stylelint": "^17.16.0",
+    "stylelint-config-css-modules": "^4.6.0",
+    "stylelint-config-standard": "^40.0.0",
     "typescript": "~6.0.3",
+    "typescript-eslint": "^8.72.1",
     "vite": "^8.3.5"
   }
 }
