@@ -330,15 +330,28 @@ def test_declared_oversized_body_is_rejected(
     assert response.json()["code"] == "request.too_large"
 
 
-def test_oversized_streamed_body_is_rejected(platform_client: TestClient) -> None:
+@pytest.mark.parametrize(
+    "content_type", ["application/json", "text/plain", "application/x-www-form-urlencoded"]
+)
+def test_oversized_streamed_body_is_rejected(
+    platform_client: TestClient, content_type: str
+) -> None:
     def chunks() -> Iterator[bytes]:
         yield from (b"a" * 1024 for _ in range(MAX_BODY_BYTES // 1024 + 1))
 
     response = platform_client.post(
-        "/test/body", content=chunks(), headers={"content-type": "application/json"}
+        "/test/body", content=chunks(), headers={"content-type": content_type}
     )
     assert response.status_code == 413
     assert response.json()["code"] == "request.too_large"
+
+
+def test_non_json_body_is_left_to_endpoint_validation(platform_client: TestClient) -> None:
+    response = platform_client.post(
+        "/test/body", content=b"not json", headers={"content-type": "text/plain"}
+    )
+    assert response.status_code == 422
+    assert response.json()["code"] == "validation.failed"
 
 
 def test_late_stream_failure_is_correlated(

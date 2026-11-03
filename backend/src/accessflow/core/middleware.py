@@ -140,14 +140,12 @@ class RequestMiddleware:
             if declared_length is not None and declared_length > MAX_BODY_BYTES:
                 await reject_too_large()
                 return
-            if not _is_json_media_type(request.headers.get("content-type", "")):
-                await self.app(scope, receive, send_response)
-                return
             body = await _read_body(request)
             if body is None:
                 await reject_too_large()
                 return
-            if body and not _is_valid_json(body):
+            is_json = _is_json_media_type(request.headers.get("content-type", ""))
+            if body and is_json and not _is_valid_json(body):
                 response = problem_response(
                     request, 422, "request.invalid_body", "Invalid request body"
                 )

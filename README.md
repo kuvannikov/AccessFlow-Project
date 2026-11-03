@@ -284,10 +284,11 @@ never exposed. Submitted values, `input`, `ctx` and exception details are omitte
 Malformed JSON, invalid UTF-8, unpaired Unicode surrogates and non-finite JSON
 numbers (`NaN`, `Infinity` and values such as `1e400` that overflow to infinity)
 return 422 `request.invalid_body`. A request body larger than 1 MiB returns 413
-`request.too_large`; the limit is checked on the declared `Content-Length` and
-again while the body is read. JSON bodies are checked before
-routing when the media type is `application/json`, `application/*+json` or
-absent. Other content types remain subject to endpoint validation.
+`request.too_large` whatever its media type; the limit is checked on the
+declared `Content-Length` and again while the body is read, before routing.
+JSON bodies are checked before routing when the media type is
+`application/json`, `application/*+json` or absent. Bodies of other media types
+are left to endpoint validation.
 
 An unexpected error returns 500 with only `code: "internal"` and `requestId`.
 Business modules can subclass `core.errors.DomainError` and register a
