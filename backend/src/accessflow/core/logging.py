@@ -2,12 +2,10 @@
 
 import json
 import logging
-from contextvars import ContextVar
 from datetime import UTC, datetime
 
 REQUEST_ID_ATTRIBUTE = "_accessflow_request_id"
 
-request_id_context: ContextVar[str] = ContextVar("request_id", default="-")
 http_logger = logging.getLogger("accessflow.http")
 
 

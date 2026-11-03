@@ -11,7 +11,7 @@ from starlette.requests import Request
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from accessflow.core.errors import internal_error_response, problem_response
-from accessflow.core.logging import REQUEST_ID_ATTRIBUTE, http_logger, request_id_context
+from accessflow.core.logging import REQUEST_ID_ATTRIBUTE, http_logger
 
 STANDARD_METHODS = frozenset({"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "TRACE"})
 MAX_BODY_BYTES = 1024 * 1024
@@ -111,7 +111,6 @@ class RequestMiddleware:
             return
         request_id = _request_id(scope)
         scope.setdefault("state", {})["request_id"] = request_id
-        context_token = request_id_context.set(request_id)
         started = perf_counter()
         status = 500
         response_started = False
@@ -187,4 +186,3 @@ class RequestMiddleware:
                 fields["origin"] = _error_origin(failure)
             level = logging.ERROR if failure is not None or status >= 500 else logging.INFO
             http_logger.log(level, "request_completed", extra=fields)
-            request_id_context.reset(context_token)

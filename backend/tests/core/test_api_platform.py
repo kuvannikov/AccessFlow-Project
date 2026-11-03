@@ -15,12 +15,7 @@ from starlette.types import Message, Scope
 from accessflow.app import create_app
 from accessflow.core.config import Settings
 from accessflow.core.errors import DomainError, ProblemDefinition
-from accessflow.core.logging import (
-    HttpFormatter,
-    ServerErrorFilter,
-    http_logger,
-    request_id_context,
-)
+from accessflow.core.logging import HttpFormatter, ServerErrorFilter, http_logger
 from accessflow.core.middleware import MAX_BODY_BYTES
 
 
@@ -71,10 +66,10 @@ def platform_app(settings: Settings) -> FastAPI:
     def crash(value: str) -> None:
         raise RuntimeError(value)
 
-    @app.get("/test/context/{value}")
-    async def context(request: Request, value: str) -> dict[str, str]:
+    @app.get("/test/request-id")
+    async def request_id(request: Request) -> dict[str, str]:
         await asyncio.sleep(0)
-        return {"context": request_id_context.get(), "state": request.state.request_id}
+        return {"requestId": request.state.request_id}
 
     @app.get("/test/stream")
     def stream() -> StreamingResponse:
@@ -235,7 +230,6 @@ def test_valid_request_id_is_used_everywhere(
     assert f'request_id="{request_id}"' in http_output.getvalue()
     assert 'route="/test/crash/{value}"' in http_output.getvalue()
     assert "canary" not in http_output.getvalue()
-    assert request_id_context.get() == "-"
 
 
 def test_duplicate_request_ids_are_replaced(platform_client: TestClient) -> None:
@@ -258,7 +252,7 @@ def test_unmatched_paths_and_methods_are_safe(
     assert logging.getLogger("uvicorn.access").disabled
 
 
-def test_context_isolated_between_concurrent_requests(platform_app: FastAPI) -> None:
+def test_request_ids_isolated_between_concurrent_requests(platform_app: FastAPI) -> None:
     async def run() -> None:
         async def invoke(request_id: str) -> None:
             messages: list[Message] = []
@@ -268,8 +262,8 @@ def test_context_isolated_between_concurrent_requests(platform_app: FastAPI) -> 
                 "http_version": "1.1",
                 "method": "GET",
                 "scheme": "http",
-                "path": "/test/context/value",
-                "raw_path": b"/test/context/value",
+                "path": "/test/request-id",
+                "raw_path": b"/test/request-id",
                 "query_string": b"",
                 "headers": [(b"x-request-id", request_id.encode())],
                 "server": ("test", 80),
@@ -284,8 +278,7 @@ def test_context_isolated_between_concurrent_requests(platform_app: FastAPI) -> 
 
             await platform_app(scope, receive, send)
             body = b"".join(message.get("body", b"") for message in messages)
-            assert body.count(request_id.encode()) == 2
-            assert request_id_context.get() == "-"
+            assert json.loads(body) == {"requestId": request_id}
 
         await asyncio.gather(*(invoke(str(uuid4())) for _ in range(10)))
 
@@ -368,7 +361,6 @@ def test_late_stream_failure_is_correlated(
     assert 'level="ERROR"' in http_output.getvalue()
     assert "status=200" in http_output.getvalue()
     assert "canary" not in http_output.getvalue()
-    assert request_id_context.get() == "-"
 
 
 def test_server_exception_log_is_safe() -> None:
@@ -390,12 +382,3 @@ def test_server_exception_log_is_safe() -> None:
     assert request_id in result
     assert "canary" not in result
     assert "\n" not in result
-
-
-def test_sequential_requests_get_fresh_context(platform_client: TestClient) -> None:
-    supplied = str(uuid4())
-    first = platform_client.get("/test/context/first", headers={"x-request-id": supplied})
-    second = platform_client.get("/test/context/second")
-    assert first.json()["context"] == supplied
-    assert second.json()["context"] == second.headers["x-request-id"]
-    assert second.json()["context"] != supplied
