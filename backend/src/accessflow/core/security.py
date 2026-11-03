@@ -1,5 +1,6 @@
 """Access tokens of the identity provider and the principal they authenticate."""
 
+import threading
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -45,9 +46,9 @@ class KeySetClient(PyJWKClient):
     PyJWKClient holds a lock during the download and remembers only successes,
     so while the identity provider hangs every request would wait for its own
     attempt in a worker thread, and the threads that also serve the health
-    endpoints would run out. Here a download that has failed is not repeated for
-    `failure_cooldown` seconds, and requests that need the key set while one is
-    being downloaded fail at once instead of waiting.
+    endpoints would run out. Here a request waits for a download in progress no
+    longer than `timeout`, and a download that has failed is not repeated for
+    `failure_cooldown` seconds, so the requests that waited for it fail at once.
     """
 
     def __init__(
@@ -60,29 +61,26 @@ class KeySetClient(PyJWKClient):
         super().__init__(uri, **options)
         self._failure_cooldown = failure_cooldown
         self._failed_at: float | None = None
-        self._downloading = False
+        self._lock = threading.Lock()
 
     def get_signing_key(self, kid: str) -> PyJWK:
-        if self._downloading and self._key_set_unavailable():
+        if not self._lock.acquire(timeout=self.timeout):
             raise IdentityProviderUnavailableError
-        return super().get_signing_key(kid)
-
-    def _key_set_unavailable(self) -> bool:
-        return self.jwk_set_cache is None or self.jwk_set_cache.get() is None
+        try:
+            return super().get_signing_key(kid)
+        finally:
+            self._lock.release()
 
     def fetch_data(self) -> Any:
         if self._failed_at is not None and (
             time.monotonic() - self._failed_at < self._failure_cooldown
         ):
             raise IdentityProviderUnavailableError
-        self._downloading = True
         try:
             data = super().fetch_data()
         except BaseException:
             self._failed_at = time.monotonic()
             raise
-        finally:
-            self._downloading = False
         self._failed_at = None
         return data
 

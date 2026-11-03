@@ -2,6 +2,7 @@ import contextlib
 import secrets
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from http import HTTPStatus
 from typing import Any
@@ -9,7 +10,7 @@ from typing import Any
 import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import ec
-from jwt import PyJWKClient
+from jwt import PyJWKClient, PyJWKClientConnectionError
 from time_machine import TimeMachineFixture
 
 from accessflow.core.config import Settings
@@ -285,16 +286,41 @@ def test_download_is_retried_after_cooldown(
     assert jwks_server.requests == 2
 
 
-def test_request_does_not_wait_for_a_download_in_progress(
-    jwks_server: JwksServer, signing_key: SigningKey, claims: dict[str, Any]
+def test_concurrent_requests_share_a_slow_download(
+    verifier: AccessTokenVerifier,
+    jwks_server: JwksServer,
+    signing_key: SigningKey,
+    claims: dict[str, Any],
 ) -> None:
-    jwks_server.stalled = True
-    keys = KeySetClient(jwks_server.url, timeout=1)
+    jwks_server.delay = 0.2
+    tokens = [signing_key.sign(claims) for _ in range(8)]
+
+    with ThreadPoolExecutor(max_workers=len(tokens)) as pool:
+        results = list(pool.map(verifier.verify, tokens))
+
+    assert results == [claims] * len(tokens)
+    assert jwks_server.requests == 1
+
+
+def test_wait_for_a_download_in_progress_is_limited_by_timeout(
+    jwks_server: JwksServer,
+    signing_key: SigningKey,
+    claims: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    download_started = threading.Event()
+
+    def stall(self: PyJWKClient) -> object:
+        download_started.set()
+        time.sleep(1)
+        raise PyJWKClientConnectionError
+
+    monkeypatch.setattr(PyJWKClient, "fetch_data", stall)
+    keys = KeySetClient(jwks_server.url, timeout=0.2)
     verifier = AccessTokenVerifier(keys, issuer=ISSUER, audience="accessflow-api")
     first = threading.Thread(target=lambda: _verify_quietly(verifier, signing_key.sign(claims)))
     first.start()
-    while jwks_server.requests == 0:
-        time.sleep(0.01)
+    download_started.wait()
 
     started = time.perf_counter()
     with pytest.raises(IdentityProviderUnavailableError):
@@ -302,8 +328,7 @@ def test_request_does_not_wait_for_a_download_in_progress(
     waited = time.perf_counter() - started
     first.join()
 
-    assert waited < 0.5
-    assert jwks_server.requests == 1
+    assert 0.2 <= waited < 0.5
 
 
 def _verify_quietly(verifier: AccessTokenVerifier, token: str) -> None:

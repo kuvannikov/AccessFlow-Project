@@ -142,8 +142,10 @@ verifies the token against the realm's public signing keys
 - the keys are cached for 5 minutes; a token with an unknown key ID reloads
   them at most once every 30 seconds; each network operation of a download
   times out after 5 seconds;
-- a failed download is not repeated for 10 seconds, and requests that need the
-  keys while a download is running get 503 at once instead of waiting.
+- a request that needs the keys while they are being downloaded waits for that
+  download, at most 5 seconds, and then gets 503; a failed download is not
+  repeated for 10 seconds, and a request that needs the keys in that time gets
+  503 at once.
 
 Roles come from `realm_access.roles` and must match exactly (`HR`, not `hr`).
 

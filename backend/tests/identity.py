@@ -2,6 +2,7 @@
 
 import json
 import threading
+import time
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from types import TracebackType
@@ -61,6 +62,7 @@ class JwksServer:
         self.keys: list[dict[str, Any]] = []
         self.response: tuple[HTTPStatus, bytes] | None = None
         self.stalled = False
+        self.delay = 0.0
         self.requests = 0
         self._released = threading.Event()
         self._server = ThreadingHTTPServer(("127.0.0.1", 0), self._handler())
@@ -76,6 +78,7 @@ class JwksServer:
                 if owner.stalled:
                     owner._released.wait()
                     return
+                time.sleep(owner.delay)
                 status, body = owner.response or (
                     HTTPStatus.OK,
                     json.dumps({"keys": owner.keys}).encode(),
