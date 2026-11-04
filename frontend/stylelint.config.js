@@ -62,5 +62,10 @@ export default {
         'declaration-property-unit-allowed-list': null,
       },
     },
+    {
+      // @font-face descriptors name the family and its weight range, not values used in styles.
+      files: ['src/shared/styles/fonts.css'],
+      rules: { 'declaration-property-value-allowed-list': null },
+    },
   ],
 }

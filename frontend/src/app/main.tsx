@@ -1,3 +1,4 @@
+import '../shared/styles/fonts.css'
 import '../shared/styles/tokens.css'
 import '../shared/styles/base.css'
 
