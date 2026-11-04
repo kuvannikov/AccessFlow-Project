@@ -1,0 +1,167 @@
+/*
+ * Components use the semantic layer only; the palette exists to define it.
+ *
+ * Breakpoints cannot be custom properties because media queries do not read
+ * them. There are two, written as numbers and allowed by the Stylelint config:
+ * 1360px (narrower workspace padding) and 767px (navigation becomes a drawer).
+ */
+
+:root,
+[data-theme='light'] {
+  color-scheme: light;
+
+  --sage-0: #fbfcfa;
+  --sage-50: #f4f6f3;
+  --sage-100: #eef2ed;
+  --sage-150: #eaeee9;
+  --sage-200: #dfe7df;
+  --sage-300: #d7dfd7;
+  --sage-500: #8b9690;
+  --sage-600: #74817b;
+  --sage-700: #5a6862;
+  --sage-900: #182b2b;
+  --forest-600: #2d5945;
+  --forest-700: #234a39;
+  --forest-800: #1b3b2d;
+  --pine-100: #ebefe8;
+  --pine-300: #b9c9c0;
+  --pine-600: #3d544b;
+  --pine-700: #335047;
+  --pine-750: #28403b;
+  --pine-800: #1d302e;
+  --clay-500: #d66e52;
+  --red-50: #fbece6;
+  --red-400: #c06a53;
+  --red-600: #a94431;
+  --red-650: #9b3f2e;
+  --red-700: #883523;
+  --red-800: #6f2a1b;
+  --teal-50: #e6f2ee;
+  --teal-500: #4f8a7b;
+  --teal-700: #1f5c50;
+  --amber-50: #f9efd8;
+  --amber-500: #a47a2c;
+  --amber-800: #73480a;
+  --blue-50: #e7f0f6;
+  --blue-500: #5b8db1;
+  --blue-600: #2b78b0;
+  --blue-800: #1f4f73;
+
+  --bg-page: var(--sage-50);
+  --bg-surface: var(--sage-0);
+  --bg-sunken: var(--sage-150);
+  --bg-hover: var(--sage-100);
+  --bg-selected: var(--sage-200);
+  --bg-disabled: var(--sage-150);
+  --bg-inverse: var(--pine-800);
+  --bg-inverse-hover: var(--pine-750);
+  --bg-inverse-selected: var(--pine-700);
+  --bg-scrim: rgb(24 43 43 / 56%);
+  --text-primary: var(--sage-900);
+  --text-secondary: var(--sage-700);
+  --text-disabled: var(--sage-500);
+  --text-link: var(--forest-600);
+  --text-on-action: var(--sage-0);
+  --text-on-inverse: var(--pine-100);
+  --text-on-inverse-muted: var(--pine-300);
+  --border-subtle: var(--sage-300);
+  --border-control: var(--sage-600);
+  --border-inverse: var(--pine-600);
+  --action-primary: var(--forest-600);
+  --action-primary-hover: var(--forest-700);
+  --action-primary-pressed: var(--forest-800);
+  --action-danger: var(--red-600);
+  --action-danger-hover: var(--red-700);
+  --action-danger-pressed: var(--red-800);
+  --focus-ring: var(--blue-600);
+  --focus-ring-inverse: var(--pine-100);
+  --status-success-text: var(--teal-700);
+  --status-success-surface: var(--teal-50);
+  --status-success-border: var(--teal-500);
+  --status-danger-text: var(--red-650);
+  --status-danger-surface: var(--red-50);
+  --status-danger-border: var(--red-400);
+  --status-warning-text: var(--amber-800);
+  --status-warning-surface: var(--amber-50);
+  --status-warning-border: var(--amber-500);
+  --status-info-text: var(--blue-800);
+  --status-info-surface: var(--blue-50);
+  --status-info-border: var(--blue-500);
+  --brand-mark: var(--clay-500);
+  --brand-mark-ink: var(--sage-0);
+
+  --shadow-overlay: 0 12px 32px rgb(24 43 43 / 18%);
+  --shadow-drawer: 8px 0 24px rgb(24 43 43 / 16%);
+  --shadow-popover: 0 4px 12px rgb(24 43 43 / 14%);
+}
+
+:root {
+  --font-sans: 'Golos Text', sans-serif;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-full: 999px;
+
+  --size-control: 44px;
+  --size-control-sm: 36px;
+  --size-icon: 20px;
+  --size-icon-sm: 16px;
+  --size-sidebar: 264px;
+  --size-content-max: 1200px;
+  --size-form-max: 640px;
+  --size-text-max: 68ch;
+  --size-dialog: 480px;
+  --size-state-max: 520px;
+  --size-table-min: 880px;
+  --size-field-min: 240px;
+  --size-topbar: 56px;
+  --size-logo-mark: 32px;
+  --size-search-max: 440px;
+  --size-date-field: 304px;
+
+  --z-nav: 20;
+  --z-popover: 30;
+  --z-scrim: 40;
+  --z-dialog: 50;
+
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Text styles are split into values so that each CSS Module can apply them. */
+  --text-title-xl-size: 32px;
+  --text-title-xl-line: 40px;
+  --text-title-xl-tracking: -0.02em;
+  --text-title-lg-size: 24px;
+  --text-title-lg-line: 32px;
+  --text-title-lg-tracking: -0.015em;
+  --text-title-md-size: 20px;
+  --text-title-md-line: 28px;
+  --text-title-md-tracking: -0.01em;
+  --text-title-sm-size: 16px;
+  --text-title-sm-line: 24px;
+  --text-body-size: 16px;
+  --text-body-line: 24px;
+  --text-body-strong-size: 16px;
+  --text-body-strong-line: 24px;
+  --text-body-sm-size: 14px;
+  --text-body-sm-line: 20px;
+  --text-label-size: 14px;
+  --text-label-line: 20px;
+  --text-caption-size: 13px;
+  --text-caption-line: 20px;
+
+  --border-width: 1px;
+  --ring-width: 2px;
+  --ring-offset: 2px;
+}
