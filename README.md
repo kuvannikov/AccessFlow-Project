@@ -1,10 +1,13 @@
 # AccessFlow
 
-Web platform for employee onboarding and offboarding driven by configurable business processes.
+Web platform for employee onboarding and offboarding driven by configurable
+business processes.
 
 ## Status
 
-Rebuild in progress. The backend API, the local infrastructure and the development user script are described below; the frontend is a minimal application without screens yet.
+Rebuild in progress. The backend API, the local infrastructure and the
+development user script are described below; the frontend is a minimal
+application without screens yet.
 
 ## Local infrastructure
 
@@ -35,9 +38,9 @@ PostgreSQL and Keycloak run in Docker Compose. All ports are bound to
 
 ### Services
 
-| Service    | Address                 | Notes                                                        |
-|------------|-------------------------|--------------------------------------------------------------|
-| PostgreSQL | `127.0.0.1:5432`        | Databases `accessflow` and `keycloak`                        |
+| Service    | Address                 | Notes                                                           |
+|------------|-------------------------|-----------------------------------------------------------------|
+| PostgreSQL | `127.0.0.1:5432`        | Databases `accessflow` and `keycloak`                           |
 | Keycloak   | `http://localhost:8081` | Admin console, user `admin`, password `KEYCLOAK_ADMIN_PASSWORD` |
 
 The realm `accessflow` is imported on the first start. Its OpenID Connect
@@ -59,11 +62,11 @@ PostgreSQL roles:
 | `make up`            | Start the services and wait until they are healthy      |
 | `make down`          | Stop and remove the containers; the data volume is kept |
 | `make ps`            | Show the state of the services                          |
-| `make logs`          | Follow the logs (stop with Ctrl+C)                      |
+| `make logs`          | Follow the logs                                         |
 | `make migrate`       | Apply the database migrations as `accessflow_owner`     |
 | `make web`           | Start the frontend dev server                           |
 | `make check`         | All backend and frontend checks                         |
-| `make check-fast`    | Formatting, lint, types and unused-code checks           |
+| `make check-fast`    | Formatting, lint, types and unused-code checks          |
 | `make test-keycloak` | Backend tests against a disposable Keycloak             |
 
 ### Data
@@ -88,17 +91,16 @@ cd backend
 uv sync --frozen
 ```
 
-`--frozen` installs exactly the versions from `uv.lock` and never changes it.
-
 ### Run
 
-The API reads its settings from `ACCESSFLOW_*` environment variables:
-the `ACCESSFLOW_DATABASE_*` connection settings and the `ACCESSFLOW_AUTH_*` access
-token settings listed in `.env.example` (migrations need only the database ones). The database port defaults to 5432 and
-the token audience `ACCESSFLOW_AUTH_AUDIENCE` to `accessflow-api`; every other
-variable is required and must not be empty, and without it the application
-refuses to start. The API
-connects as `accessflow_app`, which can read and change data but not the schema.
+The API reads its settings from `ACCESSFLOW_*` environment variables: the
+`ACCESSFLOW_DATABASE_*` connection settings and the `ACCESSFLOW_AUTH_*` access
+token settings listed in `.env.example` (migrations need only the database
+ones). The database port defaults to 5432 and the token audience
+`ACCESSFLOW_AUTH_AUDIENCE` to `accessflow-api`; every other variable is
+required and must not be empty, and without it the application refuses to
+start. The API connects as `accessflow_app`, which can read and change data but
+not the schema.
 
 The application itself does not read `.env`; `uv run --env-file` loads it into
 the process environment. Start the dev stack (`make up`) first, then:
@@ -226,7 +228,8 @@ make check
 ```
 
 It checks that `uv.lock` matches `pyproject.toml`, then runs Ruff (lint and
-format check), mypy in strict mode, import-linter and pytest. Warnings raised during tests are treated as errors.
+format check), mypy in strict mode, import-linter and pytest. Warnings raised
+during tests are treated as errors.
 
 import-linter enforces the module boundaries declared in `backend/pyproject.toml`:
 `app` may import `modules` and `core`, `modules` may import `core`, never the
@@ -301,9 +304,10 @@ Each request produces one `key=value` line with UTC time, level, `request_id`,
 method, route template, status and `duration_ms`. Unmatched routes use
 `unmatched`; logs contain no raw path, query string, headers, body or exception
 text. An unhandled exception adds `error` (its type) and `origin` (the file and
-line where it was raised). Uvicorn's default access logger is disabled by the application; keep
-`--no-access-log` in launch commands as well. Server exception logs omit
-tracebacks and preserve the request ID for failures after a response starts.
+line where it was raised). Uvicorn's default access logger is disabled by the
+application; keep `--no-access-log` in launch commands as well. Server
+exception logs omit tracebacks and preserve the request ID for failures after a
+response starts.
 Do not enable a second HTTP access logger with raw URLs or body logging.
 These operational logs are not a business audit trail.
 
@@ -311,21 +315,6 @@ If a streamed response has already started, HTTP cannot replace its status or
 body with a 500 problem. The stream fails, and its original status is logged
 at ERROR with the same request ID. Streaming endpoints are not currently part
 of the public API.
-
-To exercise malformed JSON locally, run the API and, in another terminal:
-
-```bash
-curl -i -X POST http://127.0.0.1:8000/api/health \
-  -H 'Content-Type: application/json' \
-  -H 'X-Request-ID: 94801dde-c1c2-405a-894b-749617848fd9' \
-  --data-binary '{"broken":'
-```
-
-The JSON integrity check runs before routing: expect 422 `request.invalid_body`
-even though health normally supports GET. The response header and JSON body
-must contain the supplied request ID. The terminal log shows the same ID and
-`route="unmatched"`, with no submitted body. For a normal health request, expect
-200 and `route="/api/health"`.
 
 ## Frontend
 
@@ -360,8 +349,7 @@ every new terminal before working on the frontend or running `make check`.
 make web
 ```
 
-Vite serves the application at `http://localhost:5173` and reloads it on every
-change.
+The dev server runs at `http://localhost:5173`.
 
 ### Checks
 
@@ -409,10 +397,6 @@ use the lockfiles, and the browser cache uses the frontend lockfile. Actions
 are pinned to full commit hashes. A newer run on the same branch cancels an
 older run of this workflow.
 
-Open a run in Actions, select the failed job and expand its failed step to
-read the command output. A local `make check` does not run the separate
-Keycloak tests; run `make test-keycloak` as well before checking the CI result.
-
 ### Security checks
 
 The Security workflow runs every Monday at 04:17 UTC, on pushes to `main`
@@ -422,26 +406,21 @@ Its jobs run independently:
 - OSV-Scanner checks `backend/uv.lock` and `frontend/pnpm-lock.yaml` for known
   vulnerabilities. Package names and versions are queried against the OSV
   database.
-- Gitleaks scans the checked-out branch's Git history with the default rules.
-  Findings fail the job, and detected secret values are fully redacted in the
-  output.
+- Gitleaks scans the Git history of the checked-out branch with the default
+  rules; detected secret values are fully redacted in the output.
 - Zizmor checks the workflow files and reports findings as GitHub annotations.
 
-The scanner versions are pinned. Downloaded OSV-Scanner and Gitleaks binaries
-are verified against fixed SHA256 checksums before execution. Findings fail
-the corresponding job; review the output before updating dependencies or
-changing scanner rules. A clean scan only covers vulnerabilities and secret
-patterns known to the scanners.
+The scanner versions are pinned, and the downloaded OSV-Scanner and Gitleaks
+binaries are verified against fixed SHA256 checksums before execution. Any
+finding fails its job.
 
-Enable Dependabot alerts in the repository's Settings → Advanced Security →
-Dependabot alerts. Enable the dependency graph if GitHub asks for it. Alerts
-complement the scheduled scan; dependency updates remain manual.
-See [GitHub's instructions](https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/secure-your-dependencies/configure-dependabot-alerts).
+Dependabot alerts are enabled in the repository settings and complement the
+scheduled scan; dependency updates remain manual.
 
 ### Local Git hooks
 
 Lefthook is pinned in `frontend/package.json`. Gitleaks must be available on
-`PATH`; the hooks were checked with Gitleaks 8.30.1. On macOS, install it with
+`PATH`; CI uses version 8.30.1. On macOS, install it with
 `brew install gitleaks`; other platforms can use the
 [official releases](https://github.com/gitleaks/gitleaks/releases).
 
@@ -461,13 +440,11 @@ Run Git from a terminal where Node.js, pnpm, uv and Gitleaks are available.
 Before a commit, Ruff checks staged Python files; Prettier, ESLint and
 Stylelint check staged frontend files, and Gitleaks scans the staged diff.
 Checks report errors without fixing files or automatically staging fixes.
-Lefthook temporarily hides unstaged edits in partially staged files so that
-checks see the staged version, then restores those edits.
 
 Before a push, `make check-fast` checks lockfile consistency, formatting, lint,
 types, module boundaries and unused code across both projects. It does not
 run tests or build the frontend, and needs no Docker daemon. Run `make check`
-before committing and `make test-keycloak` before checking the CI result.
+before committing and `make test-keycloak` before pushing.
 
 To run the hooks manually from the repository root:
 
@@ -475,13 +452,3 @@ To run the hooks manually from the repository root:
 pnpm --dir frontend hooks run pre-commit
 pnpm --dir frontend hooks run pre-push
 ```
-
-The pre-commit file checks normally use staged files. For a formatting check
-on an explicit file without staging it:
-
-```bash
-pnpm --dir frontend hooks run pre-commit --job prettier \
-  --file frontend/src/app/App.tsx --no-stage-fixed
-```
-
-`--no-stage-fixed` also disables hiding unstaged edits for this manual check.
