@@ -2,8 +2,10 @@ import { createRootRoute, createRoute, createRouter } from '@tanstack/react-rout
 
 import { HomePage } from '../pages/HomePage'
 import { NotFoundPage } from '../pages/NotFoundPage'
+import { ErrorScreen } from './ErrorScreen'
 
 const rootRoute = createRootRoute({
+  errorComponent: ErrorScreen,
   notFoundComponent: NotFoundPage,
 })
 
