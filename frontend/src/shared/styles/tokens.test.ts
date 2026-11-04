@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest'
 
+import fontsCss from './fonts.css?raw'
 import tokensCss from './tokens.css?raw'
 
 const TEXT = 4.5
@@ -109,4 +110,39 @@ test('the palette has no pure black or white', () => {
   const pure = [...tokens].filter(([, value]) => /^#(?:0{3}|0{6}|f{3}|f{6})$/i.test(value))
 
   expect(pure).toEqual([])
+})
+
+const bannedFamilies = [
+  'inter',
+  'roboto',
+  'arial',
+  'open sans',
+  'helvetica',
+  'space grotesk',
+  'geist',
+  'instrument serif',
+  'syne',
+  'fraunces',
+  'dm sans',
+  'plus jakarta sans',
+  'manrope',
+]
+
+function familyNames(stack: string): string[] {
+  return stack.split(',').map((family) =>
+    family
+      .trim()
+      .replace(/^['"]|['"]$/g, '')
+      .toLowerCase(),
+  )
+}
+
+test('the font stack has no banned family and leads with the bundled face', () => {
+  const stack = familyNames(tokens.get('--font-sans') ?? '')
+  const bundled = [...fontsCss.matchAll(/font-family:\s*(?<name>[^;]+);/g)].flatMap(({ groups }) =>
+    familyNames(groups?.name ?? ''),
+  )
+
+  expect(stack.filter((family) => bannedFamilies.includes(family))).toEqual([])
+  expect(bundled).toContain(stack[0])
 })
