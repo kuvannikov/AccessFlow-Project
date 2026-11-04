@@ -12,9 +12,6 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
-.coverage
-htmlcov/
-.hypothesis/
 
 # Node
 node_modules/
@@ -23,7 +20,6 @@ dist/
 playwright-report/
 test-results/
 .vitest/
-coverage/
 storybook-static/
 
 # Editors and logs

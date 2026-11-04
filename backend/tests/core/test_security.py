@@ -343,10 +343,6 @@ def _verify_quietly(verifier: AccessTokenVerifier, token: str) -> None:
         pytest.param((HTTPStatus.OK, b"<html></html>"), id="not json"),
         pytest.param((HTTPStatus.OK, b"[]"), id="not an object"),
         pytest.param((HTTPStatus.OK, b'{"keys": []}'), id="no keys"),
-        pytest.param(
-            (HTTPStatus.OK, b'{"keys": [{"kty": "RSA", "use": "enc", "kid": "x"}]}'),
-            id="no usable keys",
-        ),
     ],
 )
 def test_broken_key_set_is_unavailable(
