@@ -24,4 +24,5 @@ storybook-static/
 
 # Editors and logs
 .idea/
+.vscode/
 *.log

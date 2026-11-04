@@ -353,6 +353,35 @@ The dev server runs at `http://localhost:5173` and forwards requests under
 `/api` to the API at `http://127.0.0.1:8000`, so the browser talks to a single
 origin. Start the API as described in [Backend](#run) to work with data.
 
+### Styles
+
+Components are styled with CSS Modules. Design values are CSS custom properties
+in `frontend/src/shared/styles/tokens.css`: spacing, radii, sizes, text styles,
+shadows, layers and motion, and colors in two layers, a palette and semantic
+tokens on top of it (`--bg-page`, `--text-primary`). Components use the
+semantic colors, never the palette. `base.css` next to it holds the reset, the
+base typography, the focus ring and the rule that turns off animations and
+transitions when the system asks for reduced motion.
+
+Stylelint keeps values in the tokens. Outside `tokens.css` it rejects hex and
+named colors, color functions and gradients, any unit other than `%`, `fr` and
+`deg`, font families, sizes, line heights and z-index values that are not
+tokens, and font weights other than 400 and 600. It also rejects
+`backdrop-filter`, uppercase text and transitions or keyframes of width,
+height, margin and padding. Media queries may use only the two breakpoints,
+767px and 1360px.
+
+The only typeface is Golos Text, one variable font file in
+`frontend/src/shared/styles/fonts/` with its SIL Open Font License next to it;
+nothing is loaded from external servers. The icons and the link preview image
+are in `frontend/public/`.
+
+`tokens.test.ts` checks the contrast of the color pairs the interface uses
+(4.5:1 for text, 3:1 for borders, focus rings and the logo mark), that the
+palette has no pure black or white, and that the font stack has no banned
+typeface and starts with the bundled one. `index.html.test.ts` checks the page
+title, the meta tags, the icons and the Open Graph tags.
+
 ### Checks
 
 `make check` runs the frontend checks after the backend ones: it installs
