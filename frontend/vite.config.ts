@@ -18,6 +18,8 @@ export default defineConfig({
           name: 'unit',
           include: ['src/**/*.test.ts', '*.test.ts'],
           environment: 'node',
+          // Vitest empties every CSS request it does not process, including `?raw` text imports.
+          css: { include: [/\.css\?raw$/] },
           // A zone west of UTC turns a date shifted by the local offset into the wrong day.
           env: { TZ: 'America/New_York' },
         },
