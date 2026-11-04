@@ -349,7 +349,9 @@ every new terminal before working on the frontend or running `make check`.
 make web
 ```
 
-The dev server runs at `http://localhost:5173`.
+The dev server runs at `http://localhost:5173` and forwards requests under
+`/api` to the API at `http://127.0.0.1:8000`, so the browser talks to a single
+origin. Start the API as described in [Backend](#run) to work with data.
 
 ### Checks
 

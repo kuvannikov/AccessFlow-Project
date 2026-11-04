@@ -5,6 +5,11 @@ import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   plugins: [react(), babel({ presets: [reactCompilerPreset()] })],
+  server: {
+    proxy: {
+      '/api': 'http://127.0.0.1:8000',
+    },
+  },
   test: {
     projects: [
       {
