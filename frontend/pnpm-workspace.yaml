@@ -7,3 +7,8 @@ allowBuilds:
   # Its postinstall only fetches the native binding when the platform package
   # is missing; pnpm installs that package as an optional dependency.
   unrs-resolver: false
+
+overrides:
+  # GHSA-g3hv-75wg-m249 is fixed only in 11.0.1, while ESLint and typescript-eslint
+  # still ask for ^10; they call only minimatch() and Minimatch#match, kept in 11.
+  minimatch: ^11.0.4
