@@ -353,6 +353,20 @@ The dev server runs at `http://localhost:5173` and forwards requests under
 `/api` to the API at `http://127.0.0.1:8000`, so the browser talks to a single
 origin. Start the API as described in [Backend](#run) to work with data.
 
+### Component catalog
+
+Shared components are developed and reviewed in
+[Storybook](https://storybook.js.org/):
+
+```bash
+make storybook
+```
+
+The catalog runs at `http://localhost:6006`. Stories live next to their
+components as `*.stories.tsx`; each story shows one state of a component.
+Storybook loads the same fonts, tokens and base styles as the application, and
+its accessibility panel runs axe on the open story.
+
 ### Styles
 
 Components are styled with CSS Modules. Design values are CSS custom properties
@@ -401,14 +415,20 @@ Router rules. It also enforces the layers of `frontend/src`: `app` may import
 a feature may import `shared` but not another feature, and `shared` imports
 nothing above it. Every file under `src` must belong to one of these layers.
 
-Tests run on [Vitest](https://vitest.dev/) in two projects, chosen by the file
-extension. `*.test.ts` files form the `unit` project and run in Node.js; they
-cover code without a user interface. `*.test.tsx` files form the `browser`
-project and run in headless Chromium through Playwright, because focus and
-keyboard behave there as in a real browser. Tests live next to the code they
-cover. To run one project, use `pnpm test --project unit` or
+Tests run on [Vitest](https://vitest.dev/) in three projects. The first two
+are chosen by the file extension. `*.test.ts` files form the `unit` project and
+run in Node.js; they cover code without a user interface. `*.test.tsx` files
+form the `browser` project and run in headless Chromium through Playwright,
+because focus and keyboard behave there as in a real browser. Tests live next
+to the code they cover. To run one project, use `pnpm test --project unit` or
 `pnpm test --project browser` in `frontend/`. Screenshots of failed browser
 tests are saved to `frontend/.vitest/attachments`.
+
+The third project, `storybook`, turns every story into a test that runs in the
+same headless Chromium. The test renders the story, runs its `play` function,
+if any, and checks the result with axe against WCAG 2.2 A and AA and axe best
+practices, including the target size rule that axe leaves off by default. Any
+violation fails the test. Run it alone with `pnpm test --project storybook`.
 
 ## Continuous integration
 

@@ -1,4 +1,4 @@
-.PHONY: up down logs ps migrate web test-keycloak
+.PHONY: up down logs ps migrate web storybook test-keycloak
 .PHONY: check check-fast backend-check backend-lint frontend-check frontend-lint
 
 check: backend-check frontend-check
@@ -45,6 +45,9 @@ ps:
 
 web:
 	cd frontend && pnpm dev
+
+storybook:
+	cd frontend && pnpm storybook
 
 # Apply the migrations to the dev database as the schema owner. The API's own
 # connection settings come from .env; only the role and its password change.

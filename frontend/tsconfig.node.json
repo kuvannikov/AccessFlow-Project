@@ -19,5 +19,5 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true
   },
-  "include": ["vite.config.ts", "vite.config.test.ts", "index.html.test.ts"]
+  "include": [".storybook/main.ts", "vite.config.ts", "vite.config.test.ts", "index.html.test.ts"]
 }

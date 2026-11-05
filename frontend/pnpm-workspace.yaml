@@ -4,8 +4,9 @@ engineStrict: true
 allowBuilds:
   # Hooks are installed explicitly from the repository root.
   lefthook: false
-  # Its postinstall only fetches the native binding when the platform package
-  # is missing; pnpm installs that package as an optional dependency.
+  # Their postinstall scripts only fetch the native binary when the platform
+  # package is missing; pnpm installs that package as an optional dependency.
+  esbuild: false
   unrs-resolver: false
 
 overrides:
