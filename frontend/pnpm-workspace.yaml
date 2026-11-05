@@ -10,6 +10,9 @@ allowBuilds:
   unrs-resolver: false
 
 overrides:
+  # GHSA-3g3m-2fjr-6pw4 is fixed in 14.0.2, while the Storybook docgen plugin
+  # still asks for ^13; it calls only globSync(), kept in 14.
+  glob: ^14.0.2
   # GHSA-g3hv-75wg-m249 is fixed only in 11.0.1, while ESLint and typescript-eslint
   # still ask for ^10; they call only minimatch() and Minimatch#match, kept in 11.
   minimatch: ^11.0.4
