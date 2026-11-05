@@ -24,6 +24,11 @@ export default {
   reportInvalidScopeDisables: true,
   reportNeedlessDisables: true,
   rules: {
+    // Class names are read in TypeScript as styles.className.
+    'selector-class-pattern': [
+      '^[a-z][a-zA-Z0-9]*$',
+      { message: (selector) => `Expected class selector "${selector}" to be camelCase` },
+    ],
     'color-no-hex': true,
     'color-named': 'never',
     'function-disallowed-list': [...colorFunctions, ...gradientFunctions],

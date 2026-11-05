@@ -387,8 +387,22 @@ height, margin and padding. Media queries may use only the two breakpoints,
 
 The only typeface is Golos Text, one variable font file in
 `frontend/src/shared/styles/fonts/` with its SIL Open Font License next to it;
-nothing is loaded from external servers. The icons and the link preview image
-are in `frontend/public/`.
+nothing is loaded from external servers. The favicons and the link preview
+image are in `frontend/public/`.
+
+Shared components live in `frontend/src/shared/ui/`, one folder per component.
+Behavior, keyboard support and ARIA attributes come from
+[React Aria Components](https://react-spectrum.adobe.com/react-aria/); the look
+comes from the component's CSS Module. Class names are camelCase, which
+Stylelint checks, so a class is read as `styles.button`. Each component reads
+its classes with `pickClasses` from `shared/styles`, which gives them exact
+types and fails on import when the stylesheet lacks a requested class. Variants
+and states are data attributes rather than extra classes: the component sets
+`data-variant` and `data-size`, React Aria sets `data-hovered`, `data-pressed`,
+`data-disabled` and `data-pending`. Interface icons are inline SVG components
+in `shared/ui/icons`, taken from [Lucide](https://lucide.dev/) 0.468.0 under
+the ISC license kept in that folder; they take the text color and are hidden
+from assistive technology.
 
 `tokens.test.ts` checks the contrast of the color pairs the interface uses
 (4.5:1 for text, 3:1 for borders, focus rings and the logo mark), that the
@@ -428,7 +442,9 @@ The third project, `storybook`, turns every story into a test that runs in the
 same headless Chromium. The test renders the story, runs its `play` function,
 if any, and checks the result with axe against WCAG 2.2 A and AA and axe best
 practices, including the target size rule that axe leaves off by default. Any
-violation fails the test. Run it alone with `pnpm test --project storybook`.
+violation fails the test. Stories also check the keyboard: Enter and Space
+activate buttons, only Enter follows a link, and focus shows the focus ring.
+Run the project alone with `pnpm test --project storybook`.
 
 ## Continuous integration
 

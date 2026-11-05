@@ -1,0 +1,43 @@
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-control);
+  height: var(--size-control);
+  padding: 0;
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.iconButton[data-hovered] {
+  background: var(--bg-hover);
+}
+
+.iconButton[data-pressed] {
+  background: var(--bg-selected);
+}
+
+.iconButton[data-inverse] {
+  color: var(--text-on-inverse);
+}
+
+.iconButton[data-inverse][data-hovered] {
+  background: var(--bg-inverse-hover);
+}
+
+.iconButton[data-inverse][data-pressed] {
+  background: var(--bg-inverse-selected);
+}
+
+.iconButton[data-inverse]:focus-visible {
+  outline-color: var(--focus-ring-inverse);
+}
+
+.iconButton[data-disabled] {
+  color: var(--text-disabled);
+  cursor: not-allowed;
+}

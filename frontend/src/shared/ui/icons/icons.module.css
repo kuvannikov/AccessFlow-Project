@@ -1,0 +1,10 @@
+.icon {
+  flex: none;
+  width: var(--size-icon);
+  height: var(--size-icon);
+  fill: none;
+  stroke: currentcolor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}

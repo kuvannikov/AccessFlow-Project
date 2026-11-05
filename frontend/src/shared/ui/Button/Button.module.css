@@ -1,0 +1,161 @@
+.button {
+  position: relative;
+  display: inline-grid;
+  min-height: var(--size-control);
+  padding: 0 var(--space-4);
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
+}
+
+.label {
+  display: inline-flex;
+  grid-area: 1 / 1;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: center;
+}
+
+.label[data-hidden] {
+  visibility: hidden;
+}
+
+.button[data-variant='primary'] {
+  background: var(--action-primary);
+  color: var(--text-on-action);
+}
+
+.button[data-variant='primary'][data-hovered] {
+  background: var(--action-primary-hover);
+}
+
+.button[data-variant='primary'][data-pressed] {
+  background: var(--action-primary-pressed);
+}
+
+.button[data-variant='secondary'] {
+  border-color: var(--border-control);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.button[data-variant='secondary'][data-hovered] {
+  background: var(--bg-hover);
+}
+
+.button[data-variant='secondary'][data-pressed] {
+  background: var(--bg-selected);
+}
+
+.button[data-variant='tertiary'] {
+  padding: 0 var(--space-3);
+  background: transparent;
+  color: var(--text-link);
+}
+
+.button[data-variant='tertiary'][data-hovered] {
+  background: var(--bg-hover);
+}
+
+.button[data-variant='tertiary'][data-pressed] {
+  background: var(--bg-selected);
+}
+
+.button[data-variant='danger'] {
+  background: var(--action-danger);
+  color: var(--text-on-action);
+}
+
+.button[data-variant='danger'][data-hovered] {
+  background: var(--action-danger-hover);
+}
+
+.button[data-variant='danger'][data-pressed] {
+  background: var(--action-danger-pressed);
+}
+
+.button[data-variant='danger-quiet'] {
+  padding: 0 var(--space-3);
+  background: transparent;
+  color: var(--status-danger-text);
+}
+
+.button[data-variant='danger-quiet'][data-hovered] {
+  background: var(--status-danger-surface);
+}
+
+.button[data-variant='danger-quiet'][data-pressed] {
+  border-color: var(--status-danger-border);
+  background: var(--status-danger-surface);
+}
+
+.button[data-size='sm'] {
+  min-height: var(--size-control-sm);
+  padding: 0 var(--space-3);
+  font-size: var(--text-label-size);
+  line-height: var(--text-label-line);
+}
+
+/* Extends the hit area to the full control height. The offset starts inside the border. */
+.button[data-size='sm']::after {
+  position: absolute;
+  inset: calc((var(--size-control-sm) - var(--size-control)) / 2 - var(--border-width)) 0;
+  content: '';
+}
+
+.button[data-size='sm'] svg {
+  width: var(--size-icon-sm);
+  height: var(--size-icon-sm);
+}
+
+/* React Aria sets no hover or press state on a disabled or pending button. */
+.button[data-disabled],
+.button[data-pending] {
+  border-color: var(--border-subtle);
+  background: var(--bg-disabled);
+  color: var(--text-disabled);
+  cursor: not-allowed;
+}
+
+.button[data-pending] {
+  cursor: progress;
+}
+
+.spinner {
+  flex: none;
+  width: var(--size-icon);
+  height: var(--size-icon);
+  border: calc(var(--border-width) * 2) solid var(--text-disabled);
+  border-top-color: var(--text-primary);
+  border-radius: var(--radius-full);
+  /* stylelint-disable-next-line declaration-property-unit-allowed-list -- One turn of the ring, not an interface timing. */
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* A frozen ring still reads as busy next to its text, and the text carries the meaning. */
+  .spinner {
+    border-color: var(--action-primary);
+    border-right-color: var(--border-subtle);
+  }
+}
+
+@media (forced-colors: active) {
+  .button[data-disabled],
+  .button[data-pending] {
+    border-color: GrayText;
+    color: GrayText;
+  }
+}
