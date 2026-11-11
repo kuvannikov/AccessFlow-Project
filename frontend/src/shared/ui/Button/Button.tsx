@@ -2,9 +2,10 @@ import type { ReactNode } from 'react'
 import { Button as AriaButton, type ButtonProps as AriaButtonProps } from 'react-aria-components'
 
 import { pickClasses } from '../../styles/pickClasses'
+import { Spinner } from '../Spinner/Spinner'
 import classes from './Button.module.css'
 
-const styles = pickClasses(classes, 'button', 'label', 'spinner')
+const styles = pickClasses(classes, 'button', 'label')
 
 type PendingProps =
   | { isPending?: never; pendingLabel?: never }
@@ -47,7 +48,7 @@ export function Button({
       {/* Both labels share one grid cell, so the button is as wide as the longer one. */}
       {pendingLabel !== undefined && (
         <span className={styles.label} data-hidden={!isPending || undefined}>
-          <span className={styles.spinner} />
+          <Spinner isOnAction />
           {pendingLabel}
         </span>
       )}

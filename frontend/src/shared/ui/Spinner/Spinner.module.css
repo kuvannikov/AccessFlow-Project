@@ -1,0 +1,36 @@
+.spinner {
+  display: inline-block;
+  flex: none;
+  width: var(--size-icon);
+  height: var(--size-icon);
+  border: calc(var(--border-width) * 2) solid var(--border-subtle);
+  border-top-color: var(--action-primary);
+  border-radius: var(--radius-full);
+  /* stylelint-disable-next-line declaration-property-unit-allowed-list -- One turn of the ring, not an interface timing. */
+  animation: spin 0.8s linear infinite;
+}
+
+.spinner[data-size='sm'] {
+  width: var(--size-icon-sm);
+  height: var(--size-icon-sm);
+}
+
+.spinner[data-on-action] {
+  border-color: var(--text-disabled);
+  border-top-color: var(--text-primary);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* A frozen ring still reads as busy next to its text, and the text carries the meaning. */
+  .spinner,
+  .spinner[data-on-action] {
+    border-color: var(--action-primary);
+    border-right-color: var(--border-subtle);
+  }
+}

@@ -1,0 +1,30 @@
+.group {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.group > svg {
+  position: absolute;
+  left: var(--space-3);
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+
+.group > input {
+  padding-left: var(--space-10);
+}
+
+.group:not([data-empty]) > input {
+  padding-right: var(--size-control);
+}
+
+/* The clear button replaces the native one, which browsers draw inconsistently. */
+.group > input::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.group > button {
+  position: absolute;
+  right: 0;
+}

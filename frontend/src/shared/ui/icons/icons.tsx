@@ -22,6 +22,16 @@ export function ChevronLeftIcon() {
   )
 }
 
+export function CircleAlertIcon() {
+  return (
+    <Icon>
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" x2="12" y1="8" y2="12" />
+      <line x1="12" x2="12.01" y1="16" y2="16" />
+    </Icon>
+  )
+}
+
 export function LogOutIcon() {
   return (
     <Icon>
@@ -56,6 +66,15 @@ export function RotateCwIcon() {
     <Icon>
       <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
       <path d="M21 3v5h-5" />
+    </Icon>
+  )
+}
+
+export function SearchIcon() {
+  return (
+    <Icon>
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.3-4.3" />
     </Icon>
   )
 }
