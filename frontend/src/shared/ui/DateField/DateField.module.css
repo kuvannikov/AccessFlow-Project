@@ -1,0 +1,186 @@
+.group {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: var(--size-control);
+  padding-left: var(--space-3);
+  border: var(--border-width) solid var(--border-control);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  transition: border-color var(--duration-fast) var(--ease-standard);
+}
+
+.group[data-hovered] {
+  border-color: var(--text-primary);
+}
+
+/* The ring sits on the whole field while a segment is edited; the segment shows its fill. */
+.group:has(.segment[data-focused]) {
+  border-color: var(--focus-ring);
+  outline: var(--ring-width) solid var(--focus-ring);
+  outline-offset: 0;
+}
+
+/* The inset shadow doubles the border without changing the size of the box. */
+.group[data-invalid] {
+  border-color: var(--action-danger);
+  box-shadow: inset 0 0 0 var(--border-width) var(--action-danger);
+}
+
+.group[data-disabled] {
+  border-color: var(--border-subtle);
+  background: var(--bg-disabled);
+  color: var(--text-disabled);
+  cursor: not-allowed;
+}
+
+.input {
+  display: flex;
+  flex: 1;
+  align-items: center;
+}
+
+.segment {
+  padding: calc(var(--space-1) / 2);
+  border-radius: calc(var(--radius-sm) / 2);
+}
+
+.segment:focus-visible {
+  outline: none;
+}
+
+.segment[data-placeholder],
+.segment[data-type='literal'] {
+  color: var(--text-secondary);
+}
+
+.segment[data-type='literal'] {
+  padding: 0;
+}
+
+.segment[data-focused] {
+  background: var(--action-primary);
+  color: var(--text-on-action);
+}
+
+.group[data-disabled] .segment {
+  color: var(--text-disabled);
+}
+
+.popover {
+  z-index: var(--z-popover);
+  padding: var(--space-2);
+  border: var(--border-width) solid var(--border-control);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-popover);
+}
+
+.calendar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+}
+
+.title {
+  flex: 1;
+  padding-left: var(--space-2);
+  font-size: var(--text-title-sm-size);
+  letter-spacing: normal;
+  line-height: var(--text-title-sm-line);
+}
+
+.grid {
+  border-collapse: collapse;
+}
+
+.grid th {
+  width: var(--size-control);
+  height: var(--space-8);
+  padding: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-caption-size);
+  font-weight: 400;
+  line-height: var(--text-caption-line);
+  text-align: center;
+}
+
+.grid td {
+  padding: 0;
+}
+
+.day {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-control);
+  height: var(--size-control);
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.day[data-hovered] {
+  background: var(--bg-hover);
+}
+
+.day[data-pressed] {
+  background: var(--bg-selected);
+}
+
+/* Today has a frame and the chosen day a fill, so the two never differ by hue alone. */
+.day[data-today] {
+  border-color: var(--border-control);
+  font-weight: 600;
+}
+
+.day[data-selected] {
+  border-color: var(--action-primary);
+  background: var(--action-primary);
+  color: var(--text-on-action);
+  font-weight: 600;
+}
+
+.day[data-selected][data-hovered] {
+  border-color: var(--action-primary-hover);
+  background: var(--action-primary-hover);
+}
+
+.day[data-disabled],
+.day[data-unavailable] {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-disabled);
+  cursor: not-allowed;
+}
+
+.day[data-outside-month] {
+  display: none;
+}
+
+/* Fills disappear in this mode, so the states that live in a fill get system colors. */
+@media (forced-colors: active) {
+  .day[data-selected],
+  .segment[data-focused] {
+    background: Highlight;
+    color: HighlightText;
+    forced-color-adjust: none;
+  }
+
+  .group[data-disabled],
+  .day[data-disabled],
+  .day[data-unavailable] {
+    border-color: GrayText;
+    color: GrayText;
+  }
+}

@@ -3,6 +3,7 @@ import '../src/shared/styles/tokens.css'
 import '../src/shared/styles/base.css'
 
 import type { Preview } from '@storybook/react-vite'
+import { I18nProvider } from 'react-aria-components'
 
 const preview: Preview = {
   async beforeAll() {
@@ -20,6 +21,14 @@ const preview: Preview = {
       }
     }
   },
+  decorators: [
+    // React Aria takes its locale from the browser language, not from the page.
+    (Story) => (
+      <I18nProvider locale="ru-RU">
+        <Story />
+      </I18nProvider>
+    ),
+  ],
   parameters: {
     a11y: {
       test: 'error',

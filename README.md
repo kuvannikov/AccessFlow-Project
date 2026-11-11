@@ -404,6 +404,15 @@ in `shared/ui/icons`, taken from [Lucide](https://lucide.dev/) 0.468.0 under
 the ISC license kept in that folder; they take the text color and are hidden
 from assistive technology.
 
+React Aria takes its locale from the browser language, so the application and
+Storybook set `ru-RU` with `I18nProvider`: date formats, the first day of the
+week and the library's own labels stay Russian in any browser. Dates are
+`CalendarDate` values from `@internationalized/date`, which have no time or
+time zone. The date field reports what was typed as one of four states:
+empty, incomplete, nonexistent (31.02) or a complete date, because React Aria
+gives no value for the middle two and a form could not tell them from an empty
+field.
+
 `tokens.test.ts` checks the contrast of the color pairs the interface uses
 (4.5:1 for text, 3:1 for borders, focus rings and the logo mark), that the
 palette has no pure black or white, and that the font stack has no banned
