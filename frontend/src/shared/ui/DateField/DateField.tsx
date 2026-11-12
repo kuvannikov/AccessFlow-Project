@@ -1,5 +1,5 @@
 import type { CalendarDate } from '@internationalized/date'
-import { use, useEffect, useId, useRef } from 'react'
+import { type Ref, use, useEffect, useId, useImperativeHandle, useRef } from 'react'
 import {
   Calendar,
   CalendarCell,
@@ -21,6 +21,7 @@ import {
 
 import { pickClasses } from '../../styles/pickClasses'
 import { FieldDescription, FieldErrorMessage, FieldLabel, fieldStyles } from '../Field/Field'
+import { FormGroupDisabledContext } from '../Form/formGroupContext'
 import { IconButton } from '../IconButton/IconButton'
 import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon } from '../icons/icons'
 import classes from './DateField.module.css'
@@ -61,8 +62,10 @@ export type DateFieldProps = Omit<
   isOptional?: boolean
   description?: string
   /** Marks the field invalid and replaces the description. */
-  errorMessage?: string
+  errorMessage?: string | undefined
   onChange?: (entry: DateEntry) => void
+  /** Focuses the first segment, where typing starts. */
+  ref?: Ref<{ focus: () => void }>
 }
 
 export function DateField({
@@ -71,13 +74,21 @@ export function DateField({
   description,
   errorMessage,
   onChange,
+  isDisabled = false,
+  ref,
   ...props
 }: DateFieldProps) {
   const isInvalid = errorMessage !== undefined
+  const isGroupDisabled = use(FormGroupDisabledContext)
+  const inputRef = useRef<HTMLDivElement>(null)
   const dialogTitleId = useId()
   const lastEntry = useRef<DateEntry>(
     props.defaultValue ? { status: 'complete', date: props.defaultValue } : { status: 'empty' },
   )
+
+  useImperativeHandle(ref, () => ({
+    focus: () => inputRef.current?.querySelector<HTMLElement>('[role="spinbutton"]')?.focus(),
+  }))
 
   const reportEntry = (entry: DateEntry) => {
     if (!isSameDateEntry(entry, lastEntry.current)) {
@@ -90,13 +101,14 @@ export function DateField({
     <DatePicker
       {...props}
       className={fieldStyles.field}
+      isDisabled={isDisabled || isGroupDisabled}
       isInvalid={isInvalid}
       // Forms validate with their own rules; native validation would show browser bubbles.
       validationBehavior="aria"
     >
       <FieldLabel isOptional={isOptional}>{label}</FieldLabel>
       <Group className={styles.group}>
-        <DateInput className={styles.input}>
+        <DateInput ref={inputRef} className={styles.input}>
           {(segment) =>
             segment.type === 'day' ? (
               <>

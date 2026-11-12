@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, fn } from 'storybook/test'
 
+import { FormGroup } from '../Form/Form'
 import { expectFocusRing } from '../storyChecks'
 import { SearchField } from './SearchField'
 
@@ -61,5 +62,22 @@ export const WithValue: Story = {
     await expect(input).toHaveFocus()
     await expect(args.onClear).toHaveBeenCalledTimes(1)
     await expect(clear).not.toBeInTheDocument()
+  },
+}
+
+export const DisabledByGroup: Story = {
+  args: { defaultValue: 'разраб' },
+  render: (args) => (
+    <FormGroup legend="Сотрудники" isDisabled>
+      <SearchField {...args} />
+    </FormGroup>
+  ),
+  play: async ({ canvas, userEvent }) => {
+    const input = canvas.getByRole('searchbox', { name: 'Поиск сотрудников' })
+
+    await expect(input).toBeDisabled()
+    await expect(input).toHaveAttribute('data-disabled', 'true')
+    await userEvent.tab()
+    await expect(input).not.toHaveFocus()
   },
 }

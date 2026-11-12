@@ -114,9 +114,14 @@
   height: var(--size-icon-sm);
 }
 
-/* React Aria sets no hover or press state on a disabled or pending button. */
+/*
+ * React Aria sets no hover or press state on a disabled or pending button. A button that
+ * stays in the tab order with aria-disabled still gets them, so the variant attribute lifts
+ * its rule above the hover and press rules.
+ */
 .button[data-disabled],
-.button[data-pending] {
+.button[data-pending],
+.button[data-variant][aria-disabled='true'] {
   border-color: var(--border-subtle);
   background: var(--bg-disabled);
   color: var(--text-disabled);
@@ -129,7 +134,8 @@
 
 @media (forced-colors: active) {
   .button[data-disabled],
-  .button[data-pending] {
+  .button[data-pending],
+  .button[aria-disabled='true'] {
     border-color: GrayText;
     color: GrayText;
   }

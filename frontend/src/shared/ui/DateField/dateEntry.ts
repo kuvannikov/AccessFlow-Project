@@ -47,3 +47,16 @@ export function isSameDateEntry(a: DateEntry, b: DateEntry) {
   }
   return a.status === b.status
 }
+
+/** The message for an entry that is not a date; an empty field is left to the form's own rules. */
+export function dateEntryError(entry: DateEntry) {
+  switch (entry.status) {
+    case 'incomplete':
+      return 'Введите дату полностью: день, месяц и год.'
+    case 'nonexistent':
+      return 'Такой даты нет. Проверьте день и месяц.'
+    case 'empty':
+    case 'complete':
+      return undefined
+  }
+}

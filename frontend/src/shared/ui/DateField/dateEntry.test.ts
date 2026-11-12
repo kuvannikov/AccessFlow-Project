@@ -1,7 +1,7 @@
 import { CalendarDate } from '@internationalized/date'
 import { describe, expect, it } from 'vitest'
 
-import { isSameDateEntry, readDateEntry } from './dateEntry'
+import { dateEntryError, isSameDateEntry, readDateEntry } from './dateEntry'
 
 const literal = { type: 'literal', isPlaceholder: false } as const
 
@@ -65,5 +65,26 @@ describe('isSameDateEntry', () => {
         { status: 'complete', date: new CalendarDate(2026, 1, 1) },
       ),
     ).toBe(false)
+  })
+})
+
+describe('dateEntryError', () => {
+  it('names what is missing in an incomplete date', () => {
+    expect(dateEntryError({ status: 'incomplete' })).toBe(
+      'Введите дату полностью: день, месяц и год.',
+    )
+  })
+
+  it('points at the day and month of a nonexistent date', () => {
+    expect(dateEntryError({ status: 'nonexistent' })).toBe(
+      'Такой даты нет. Проверьте день и месяц.',
+    )
+  })
+
+  it('accepts an empty field and a full date', () => {
+    expect(dateEntryError({ status: 'empty' })).toBeUndefined()
+    expect(
+      dateEntryError({ status: 'complete', date: new CalendarDate(2026, 10, 19) }),
+    ).toBeUndefined()
   })
 })

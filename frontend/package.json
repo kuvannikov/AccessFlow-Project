@@ -26,7 +26,8 @@
     "@tanstack/react-router": "^1.170.46",
     "react": "^19.3.1",
     "react-aria-components": "^1.22.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "react-hook-form": "^7.91.0"
   },
   "devDependencies": {
     "@babel/core": "^8.0.9",

@@ -411,7 +411,18 @@ week and the library's own labels stay Russian in any browser. Dates are
 time zone. The date field reports what was typed as one of four states:
 empty, incomplete, nonexistent (31.02) or a complete date, because React Aria
 gives no value for the middle two and a form could not tell them from an empty
-field.
+field. When the field loses focus, React Aria moves a nonexistent day to the
+last day of the month.
+
+Forms are laid out with `Form`, `FormGroup` and `FormRow` from `shared/ui/Form`
+and bound to [React Hook Form](https://react-hook-form.com/) with `Controller`.
+A field shows an error only from its `errorMessage` prop, so the form's rules
+decide what is wrong, and an error from the server reaches its field through
+`setError`. A disabled group sets `disabled` on its `<fieldset>` and passes it
+to the fields inside, because React Aria fields and date segments ignore a
+disabled fieldset. The date field is uncontrolled and reads its value only
+when it mounts: to reset a form, call `reset()` and change the date field's
+`key` so that it mounts again.
 
 `tokens.test.ts` checks the contrast of the color pairs the interface uses
 (4.5:1 for text, 3:1 for borders, focus rings and the logo mark), that the
